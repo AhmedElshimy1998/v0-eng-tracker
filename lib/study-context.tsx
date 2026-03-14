@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react"
 import { Subject, Lecture, Exam, Task, Resource, LectureStatus, Schedule } from "./types"
 import { mockSubjects } from "./mock-data"
-
-const STORAGE_KEY = "studyhub-subjects"
+import { getCloudData, saveCloudData } from "./actions"
 
 interface StudyContextType {
   subjects: Subject[]
@@ -28,31 +27,38 @@ interface StudyContextType {
   updateSchedule: (subjectId: string, scheduleId: string, data: Partial<Schedule>) => void
   deleteSchedule: (subjectId: string, scheduleId: string) => void
   getSubjectProgress: (subjectId: string) => number
+  isLoading: boolean
 }
 
 const StudyContext = createContext<StudyContextType | undefined>(undefined)
 
 export function StudyProvider({ children }: { children: ReactNode }) {
-  const [subjects, setSubjects] = useState<Subject[]>(mockSubjects)
+  const [subjects, setSubjects] = useState<Subject[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Load data from localStorage on initial render
+  // جلب البيانات من السحابة عند فتح الموقع
   useEffect(() => {
-    const savedSubjects = localStorage.getItem(STORAGE_KEY)
-    if (savedSubjects) {
-      try {
-        setSubjects(JSON.parse(savedSubjects))
-      } catch (error) {
-        console.error("Failed to parse subjects from localStorage:", error)
+    async function loadData() {
+      setIsLoading(true)
+      const cloudSubjects = await getCloudData()
+      
+      if (cloudSubjects && cloudSubjects.length > 0) {
+        setSubjects(cloudSubjects)
+      } else {
+        // لو مفيش بيانات سحابية، نعرض البيانات الافتراضية
+        setSubjects(mockSubjects)
       }
+      setIsInitialized(true)
+      setIsLoading(false)
     }
-    setIsInitialized(true)
+    loadData()
   }, [])
 
-  // Save data to localStorage whenever subjects change
+  // حفظ أي تعديل جديد فوراً على السحابة
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(subjects))
+      saveCloudData(subjects)
     }
   }, [subjects, isInitialized])
 
@@ -377,6 +383,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         updateSchedule,
         deleteSchedule,
         getSubjectProgress,
+        isLoading,
       }}
     >
       {children}
