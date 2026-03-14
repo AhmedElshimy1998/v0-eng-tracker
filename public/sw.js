@@ -10,66 +10,59 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(clients.claim())
 })
 
-// Handle notification clicks
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close()
+// 1. الحدث الجديد: استقبال الإشعار من السيرفر (Push Event)
+// ده اللي هيصحي المتصفح والموقع مقفول
+self.addEventListener("push", (event) => {
+  // استقبال البيانات الجاية من السيرفر
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || "تنبيه StudyHub";
   
+  const options = {
+    body: data.body || "لديك محاضرة قريبة!",
+    icon: "/icon.svg",
+    badge: "/icon.svg",
+    vibrate: [200, 100, 200],
+    requireInteraction: true, // يفضل موجود لحد ما المستخدم يتفاعل معاه
+    data: { 
+      url: data.url || "/" 
+    },
+    actions: [
+      { action: "acknowledge", title: "Acknowledge" },
+      { action: "dismiss", title: "Dismiss" },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 2. التحكم في الضغط على الإشعار (مدمج ومحسن)
+self.addEventListener("notificationclick", (event) => {
+  const action = event.action;
+  
+  // نقفل الإشعار أول ما نضغط عليه
+  event.notification.close();
+
+  // لو المستخدم ضغط Dismiss، منعملش حاجة تانية
+  if (action === "dismiss") {
+    return;
+  }
+
+  // في حالة الضغط العادي أو Acknowledge، نفتح الموقع
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it
+      // لو الموقع مفتوح في تاب، نروح للتاب ده
       for (const client of clientList) {
         if (client.url.includes(self.registration.scope) && "focus" in client) {
-          return client.focus()
+          return client.focus();
         }
       }
-      // Otherwise, open a new window
+      // لو الموقع مقفول خالص، نفتح تاب جديد
       if (clients.openWindow) {
-        return clients.openWindow("/")
+        const targetUrl = event.notification.data && event.notification.data.url 
+          ? event.notification.data.url 
+          : "/";
+        return clients.openWindow(targetUrl);
       }
     })
-  )
-})
-
-// Handle messages from the main app
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SCHEDULE_NOTIFICATION") {
-    const { title, body, tag, delay, requireInteraction } = event.data
-    
-    setTimeout(() => {
-      self.registration.showNotification(title, {
-        body,
-        tag,
-        requireInteraction: requireInteraction !== false,
-        icon: "/icon.svg",
-        badge: "/icon.svg",
-        actions: [
-          { action: "acknowledge", title: "Acknowledge" },
-          { action: "dismiss", title: "Dismiss" },
-        ],
-      })
-    }, delay)
-  }
-})
-
-// Handle notification actions
-self.addEventListener("notificationclick", (event) => {
-  const action = event.action
-  
-  if (action === "acknowledge" || action === "dismiss") {
-    event.notification.close()
-  }
-  
-  // Always try to focus or open the app
-  event.waitUntil(
-    clients.matchAll({ type: "window" }).then((clientList) => {
-      for (const client of clientList) {
-        if ("focus" in client) {
-          return client.focus()
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow("/")
-      }
-    })
-  )
-})
+  );
+});

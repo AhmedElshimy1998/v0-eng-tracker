@@ -1,5 +1,5 @@
 "use client"
-
+import { savePushSubscription } from "./actions"
 import { Subject, DayOfWeek } from "./types"
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -291,17 +291,47 @@ export function acknowledgeNotification(
 }
 
 // Service Worker registration for background notifications
+// دالة لتحويل المفتاح العام لصيغة يفهمها المتصفح
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if (!("serviceWorker" in navigator)) {
-    console.warn("Service workers are not supported")
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    console.warn("Push notifications are not supported")
     return null
   }
   
   try {
     const registration = await navigator.serviceWorker.register("/sw.js")
+    await navigator.serviceWorker.ready
+
+    const existingSubscription = await registration.pushManager.getSubscription()
+    if (existingSubscription) {
+      await savePushSubscription(existingSubscription)
+      return registration
+    }
+
+    const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!publicVapidKey) return registration
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicVapidKey),
+    })
+
+    await savePushSubscription(subscription)
+    
     return registration
   } catch (error) {
-    console.error("Service worker registration failed:", error)
+    console.error("Service worker registration/subscription failed:", error)
     return null
   }
 }

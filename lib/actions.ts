@@ -26,3 +26,22 @@ export async function saveCloudData(subjects: Subject[]) {
     return { success: false }
   }
 }
+
+// دالة لحفظ اشتراك المتصفح في الإشعارات
+export async function savePushSubscription(sub: any) {
+  try {
+    // نجلب الاشتراكات القديمة (لو فاتح الموقع من الموبايل واللاب توب مع بعض)
+    const existingSubs: any[] = (await kv.get("push-subscriptions")) || [];
+    
+    // نمنع تكرار نفس الاشتراك
+    const isDuplicate = existingSubs.find((s) => s.endpoint === sub.endpoint);
+    if (!isDuplicate) {
+      existingSubs.push(sub);
+      await kv.set("push-subscriptions", existingSubs);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save push subscription to cloud:", error);
+    return { success: false };
+  }
+}
