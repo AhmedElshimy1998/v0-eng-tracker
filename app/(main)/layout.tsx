@@ -20,7 +20,7 @@ export default function MainLayout({
                     {!hideNavigation && <AppSidebar />}
                       
                             {/* الـ Padding اليساري pl-64 يطبق فقط إذا لم تكن صفحة الهبوط */}
-                                  <main className={!isLandingPage ? "pl-64" : ""}>
+                                  <main className={!hideNavigation ? "pl-64" : ""}>
                                           <div className="container mx-auto max-w-7xl p-6 lg:p-8">
                                                     {children}
                                                             </div>
