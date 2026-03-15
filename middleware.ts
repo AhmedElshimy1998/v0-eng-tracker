@@ -2,7 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // 1. تحديد المسارات المسموح الدخول ليها بدون تسجيل (لو هتعمل صفحة هبوط مثلاً)
 // حالياً هنخلي كل حاجة مقفولة ما عدا مسارات Clerk الداخلية
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
+// أضفنا '/' عشان نسمح بزيارة الصفحة الرئيسية
+const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
+
 
 export default clerkMiddleware(async (auth, req) => {
   // 2. جلب بيانات المستخدم (هل هو مسجل دخول ولا لأ؟)
