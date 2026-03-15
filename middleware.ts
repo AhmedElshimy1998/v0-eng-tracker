@@ -1,24 +1,36 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse, NextRequest } from "next/server"; // أضفنا NextRequest هنا
+import { NextResponse, NextRequest } from "next/server";
 
-// تحديد المسارات العامة
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/api(.*)', '/api']);
+// 1. حدد المسارات العامة بدقة
+const isPublicRoute = createRouteMatcher([
+  '/', 
+    '/sign-in(.*)', 
+      '/sign-up(.*)', 
+        '/api(.*)' // عشان الـ Cron Job ميتمنعش
+        ]);
 
-export default clerkMiddleware(async (auth, req: NextRequest) => { // حددنا النوع هنا req: NextRequest
-  const { userId } = await auth();
+        export default clerkMiddleware(async (auth, req: NextRequest) => {
+          const { userId } = await auth();
+            const isPublic = isPublicRoute(req);
 
-    // لو المستخدم مش مسجل دخول وبيحاول يدخل مسار خاص
-      if (!userId && !isPublicRoute(req)) {
-          const url = req.nextUrl.clone();
-              url.pathname = '/';
-                  return NextResponse.redirect(url);
-                    }
-                    });
+              // 2. لو المستخدم مش مسجل وبيحاول يدخل مسار خاص -> اطرده للرئيسية
+                if (!userId && !isPublic) {
+                    const signInUrl = new URL('/', req.url);
+                        return NextResponse.redirect(signInUrl);
+                          }
 
-                    export const config = {
-                      matcher: [
-                          '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-                              '/(api|trpc)(.*)',
-                                ],
-                                };
-                                
+                            // 3. لو مسجل دخول وفاتح الصفحة الرئيسية -> حوله للداشبورد فوراً (عشان ميبقاش فيه تعارض)
+                              if (userId && req.nextUrl.pathname === '/') {
+                                  const dashboard = new URL('/dashboard', req.url);
+                                      return NextResponse.redirect(dashboard);
+                                        }
+                                          
+                                            return NextResponse.next();
+                                            });
+
+                                            export const config = {
+                                              matcher: [
+                                                  '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+                                                      '/(api|trpc)(.*)',
+                                                        ],
+                                                        };
