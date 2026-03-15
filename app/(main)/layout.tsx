@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs'
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "sonner"
 
@@ -7,6 +8,7 @@ export default function MainLayout({
   children: React.ReactNode
 }) {
   return (
+    <ClerkProvider>
     <div className="min-h-screen bg-background">
       <AppSidebar />
       <main className="pl-64">
@@ -16,5 +18,6 @@ export default function MainLayout({
       </main>
       <Toaster richColors position="top-right" />
     </div>
+    </ClerkProvider>
   )
 }
