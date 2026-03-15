@@ -2,24 +2,31 @@
 
 import { kv } from "@vercel/kv"
 import { Subject } from "./types"
+import { auth } from "@clerk/nextjs/server" // إضافة مكتبة Clerk
 
-const KV_KEY = "studyhub-cloud-data"
-
-// دالة لجلب البيانات من السحابة
+// دالة لجلب البيانات من السحابة الخاصة بالمستخدم فقط
 export async function getCloudData() {
   try {
-    const data = await kv.get<Subject[]>(KV_KEY)
-    return data
+    const { userId } = await auth(); // جلب كود المستخدم
+    if (!userId) return null; // لو مش مسجل دخول، متجيبش حاجة
+
+    // جلب بيانات هذا المستخدم تحديداً
+    const data = await kv.get<Subject[]>(`studyhub-cloud-data-${userId}`)
+    return data || []
   } catch (error) {
     console.error("Failed to fetch from cloud:", error)
     return null
   }
 }
 
-// دالة لحفظ البيانات في السحابة
+// دالة لحفظ البيانات في السحابة الخاصة بالمستخدم فقط
 export async function saveCloudData(subjects: Subject[]) {
   try {
-    await kv.set(KV_KEY, subjects)
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    // حفظ البيانات في صندوق خاص بهذا المستخدم
+    await kv.set(`studyhub-cloud-data-${userId}`, subjects)
     return { success: true }
   } catch (error) {
     console.error("Failed to save to cloud:", error)
@@ -27,17 +34,22 @@ export async function saveCloudData(subjects: Subject[]) {
   }
 }
 
-// دالة لحفظ اشتراك المتصفح في الإشعارات
+// دالة لحفظ اشتراك المتصفح في الإشعارات الخاصة بالمستخدم
 export async function savePushSubscription(sub: any) {
   try {
-    // نجلب الاشتراكات القديمة (لو فاتح الموقع من الموبايل واللاب توب مع بعض)
-    const existingSubs: any[] = (await kv.get("push-subscriptions")) || [];
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    const key = `push-subscriptions-${userId}`; // مفتاح إشعارات خاص بالمستخدم
+    
+    // نجلب الاشتراكات القديمة الخاصة بهذا المستخدم فقط
+    const existingSubs: any[] = (await kv.get(key)) || [];
     
     // نمنع تكرار نفس الاشتراك
     const isDuplicate = existingSubs.find((s) => s.endpoint === sub.endpoint);
     if (!isDuplicate) {
       existingSubs.push(sub);
-      await kv.set("push-subscriptions", existingSubs);
+      await kv.set(key, existingSubs);
     }
     return { success: true };
   } catch (error) {
