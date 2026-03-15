@@ -8,7 +8,7 @@ import './globals.css'
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
 export const metadata: Metadata = {
-  title: 'StudyHub - Academic Progress Tracker',
+  title: 'Engineering Tracker - Academic Progress Tracker',
   description: 'Track your courses, lectures, and academic progress',
   generator: 'v0.app',
   icons: {

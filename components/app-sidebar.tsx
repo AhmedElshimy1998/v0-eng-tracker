@@ -22,9 +22,9 @@ export function AppSidebar() {
       <div className="flex h-full flex-col">
         <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <GraduationCap className="h-5 w-5 text-primary-foreground" />
+              <GraduationCap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-semibold text-sidebar-foreground">StudyHub</span>
+          <span className="text-xl font-semibold text-sidebar-foreground">Engineering Tracker</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">

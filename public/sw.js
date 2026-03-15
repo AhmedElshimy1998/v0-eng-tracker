@@ -15,7 +15,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("push", (event) => {
   // استقبال البيانات الجاية من السيرفر
   const data = event.data ? event.data.json() : {};
-  const title = data.title || "تنبيه StudyHub";
+  const title = data.title || "تنبيه Engineering Tracker";
   
   const options = {
     body: data.body || "لديك محاضرة قريبة!",
