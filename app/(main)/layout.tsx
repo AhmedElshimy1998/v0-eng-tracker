@@ -11,10 +11,13 @@ export default function MainLayout({
 }) {
   const pathname = usePathname()
   const isLandingPage = pathname === "/"
+  const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+
+  const hideNavigation = isLandingPage || isAuthPage;
   return (
       <ClerkProvider>
           <div className="min-h-screen bg-background">
-                {!isLandingPage && <AppSidebar />}
+                    {!hideNavigation && <AppSidebar />}
                       
                             {/* الـ Padding اليساري pl-64 يطبق فقط إذا لم تكن صفحة الهبوط */}
                                   <main className={!isLandingPage ? "pl-64" : ""}>
