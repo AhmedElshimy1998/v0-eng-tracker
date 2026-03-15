@@ -6,7 +6,9 @@ const isPublicRoute = createRouteMatcher([
   '/', 
     '/sign-in(.*)', 
       '/sign-up(.*)', 
-        '/api(.*)'
+        '/api(.*)',
+        '/icon(.*)',
+        '/logo(.*)'
         ]);
 
         // 2. إعداد الـ Proxy (البديل للميدل وير)

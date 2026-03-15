@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+      <mask id="gear-mask">
+            <rect width="400" height="400" fill="white" />
+                  <circle cx="200" cy="150" r="60" fill="black" />
+                      </mask>
+                        </defs>
+
+                          <g mask="url(#gear-mask)" fill="#061c2f">
+                              <circle cx="200" cy="150" r="85" />
+                                  <path d="M 125 185 L 200 290 L 275 185 Z" />
+                                      <rect x="180" y="45" width="40" height="30" rx="4" />
+                                          <rect x="180" y="45" width="40" height="30" rx="4" transform="rotate(45 200 150)" />
+                                              <rect x="180" y="45" width="40" height="30" rx="4" transform="rotate(90 200 150)" />
+                                                  <rect x="180" y="45" width="40" height="30" rx="4" transform="rotate(-45 200 150)" />
+                                                      <rect x="180" y="45" width="40" height="30" rx="4" transform="rotate(-90 200 150)" />
+                                                        </g>
+
+                                                          <g stroke="#00d5ff" stroke-linecap="round">
+                                                              <circle cx="200" cy="150" r="50" fill="none" stroke-width="6" />
+                                                                  
+                                                                      <line x1="200" y1="108" x2="200" y2="116" stroke-width="4" />
+                                                                          <line x1="200" y1="184" x2="200" y2="192" stroke-width="4" />
+                                                                              <line x1="158" y1="150" x2="166" y2="150" stroke-width="4" />
+                                                                                  <line x1="234" y1="150" x2="242" y2="150" stroke-width="4" />
+                                                                                      
+                                                                                          <circle cx="200" cy="150" r="5" fill="#00d5ff" stroke="none" />
+                                                                                              <line x1="200" y1="150" x2="175" y2="135" stroke-width="6" />
+                                                                                                  <line x1="200" y1="150" x2="225" y2="120" stroke-width="5" />
+                                                                                                    </g>
+
+                                                                                                      <g font-family="system-ui, -apple-system, sans-serif" font-weight="900" text-anchor="middle" fill="#061c2f">
+                                                                                                          <text x="200" y="340" font-size="38" letter-spacing="4">ENGINEERING</text>
+                                                                                                              <text x="200" y="380" font-size="34" letter-spacing="3">TRACKER</text>
+                                                                                                                </g>
+                                                                                                                </svg>
+                                                                                                                
