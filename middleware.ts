@@ -1,27 +1,24 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse, NextRequest } from "next/server"; // أضفنا NextRequest هنا
 
-// 1. تحديد المسارات المسموح الدخول ليها بدون تسجيل (لو هتعمل صفحة هبوط مثلاً)
-// حالياً هنخلي كل حاجة مقفولة ما عدا مسارات Clerk الداخلية
-// أضفنا '/' عشان نسمح بزيارة الصفحة الرئيسية
+// تحديد المسارات العامة
 const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)']);
 
+export default clerkMiddleware(async (auth, req: NextRequest) => { // حددنا النوع هنا req: NextRequest
+  const { userId } = await auth();
 
-export default clerkMiddleware(async (auth, req) => {
-  // 2. جلب بيانات المستخدم (هل هو مسجل دخول ولا لأ؟)
-  const { userId, redirectToSignIn } = await auth();
+    // لو المستخدم مش مسجل دخول وبيحاول يدخل مسار خاص
+      if (!userId && !isPublicRoute(req)) {
+          const url = req.nextUrl.clone();
+              url.pathname = '/';
+                  return NextResponse.redirect(url);
+                    }
+                    });
 
-  // 3. لو مش مسجل دخول، وبيحاول يفتح صفحة مقفولة -> اطرده لصفحة اللوجن
-  if (!userId && !isPublicRoute(req)) {
-    return redirectToSignIn();
-  }
-});
-
-export const config = {
-  matcher: [
-    // تخطي ملفات النظام والصور
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // حماية مسارات الـ API
-    '/(api|trpc)(.*)',
-  ],
-};
-
+                    export const config = {
+                      matcher: [
+                          '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+                              '/(api|trpc)(.*)',
+                                ],
+                                };
+                                
