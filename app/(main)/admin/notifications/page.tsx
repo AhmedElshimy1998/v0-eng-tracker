@@ -21,9 +21,15 @@ export default function AdminNotificationsPage() {
     courseName: ""
   });
 
-  // جلب الأقسام الحقيقية عند تحميل الصفحة
+  // جلب الأقسام الحقيقية وعمل فلترة لها
   useEffect(() => {
-    getDepartments().then(setDepartments);
+    getDepartments().then((data) => {
+      // هنا بنستبعد الأقسام اللي مش عاوزينها تظهر في الإشعارات
+      const filteredDepts = data.filter(dept => 
+        dept.name !== "المواد العامة (جامعة/كلية)"
+      );
+      setDepartments(filteredDepts);
+    });
   }, []);
 
   const handleSend = async () => {
@@ -70,7 +76,7 @@ export default function AdminNotificationsPage() {
             <div>
               <label className="text-xs font-bold">القسم</label>
               <select 
-                className="w-full mt-1 border rounded p-2 text-sm bg-background" 
+                className="w-full mt-1 border rounded p-2 text-sm bg-background text-right" 
                 value={filters.department}
                 onChange={(e) => setFilters({...filters, department: e.target.value})}
               >
