@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Circle, GraduationCap, Map, BookOpen } from "lucide-react";
+import { GraduationCap, Map, BookOpen, Loader2 } from "lucide-react";
 import { getAcademicProfile } from "@/lib/academicActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
@@ -11,20 +11,35 @@ import { coursesCatalog } from "@/lib/courses";
 export default function DegreeAudit() {
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState({ total: 0, percent: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getAcademicProfile().then(p => {
       if (p) {
         setProfile(p);
-        const allRecords = (p.semesters || []).flatMap((s: any) => s.courses);
+        const semesters = p.semesters || [];
+        const allRecords = semesters.flatMap((s: any) => s.courses);
         const effective = getEffectiveRecords(allRecords);
         const { totalCredits } = calculateGPA(effective, coursesCatalog);
-        setStats({ total: totalCredits, percent: Math.min((totalCredits / 160) * 100, 100) });
+        
+        // بافتراض أن ساعات التخرج الكلية 160 ساعة
+        const totalRequired = 160;
+        setStats({ 
+          total: totalCredits, 
+          percent: Math.min((totalCredits / totalRequired) * 100, 100) 
+        });
       }
+      setLoading(false);
     });
   }, []);
 
-  const totalRequired = 160; // عدد ساعات التخرج الكلية
+  const totalRequired = 160;
+
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="flex-1 p-4 md:p-8 space-y-8 max-w-5xl mx-auto" dir="rtl">
@@ -60,7 +75,7 @@ export default function DegreeAudit() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-500">{Math.max(totalRequired - stats.total, 0)} ساعة</div>
-            <p className="text-sm text-muted-foreground mt-1">يجب إنهاؤها للحصول على درجة البكالوريوس.</p>
+            <p className="text-sm text-muted-foreground mt-1">ساعات دراسية تفصلك عن درجة البكالوريوس.</p>
           </CardContent>
         </Card>
 
@@ -69,17 +84,17 @@ export default function DegreeAudit() {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-blue-500" /> الحالة الأكاديمية
-            </CardHeader>
+            </CardTitle>
           </CardHeader>
           <CardContent>
              <p className="text-sm text-muted-foreground mb-1">القسم الدراسي الحالي:</p>
-             <p className="font-bold">{profile?.department || "لم يحدد بعد"}</p>
+             <p className="font-bold text-lg">{profile?.department || "لم يحدد بعد"}</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="bg-muted/20 border border-dashed rounded-xl p-8 text-center space-y-3">
-         <p className="text-muted-foreground text-sm font-medium">قريباً: سيتم إضافة قائمة المواد الإجبارية والاختيارية المتبقية بالاسم بناءً على لائحة قسمك.</p>
+         <p className="text-muted-foreground text-sm font-medium">قريباً: سيتم إضافة قائمة المواد الإجبارية والاختيارية المتبقية بالاسم بناءً على لائحة قسمك الفعلية.</p>
       </div>
     </div>
   );
