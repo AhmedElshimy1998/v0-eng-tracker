@@ -13,7 +13,8 @@ import {
   Briefcase,
   RefreshCw,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Lock // أضفنا أيقونة القفل
 } from "lucide-react"
 import { getSmartAnalysis } from "@/lib/aiActions"
 import { cn } from "@/lib/utils"
@@ -25,6 +26,14 @@ export default function AIMentorPage() {
   const loadAnalysis = async () => {
     setLoading(true)
     const result = await getSmartAnalysis()
+    
+    // فحص إذا تم الوصول للحد الأقصى (24 ساعة)
+    if (result?.isLimitReached) {
+      setData({ limitMessage: result.message }); 
+      setLoading(false);
+      return;
+    }
+
     setData(result)
     setLoading(false)
   }
@@ -37,21 +46,43 @@ export default function AIMentorPage() {
     return (
       <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
         <BrainCircuit className="h-16 w-16 text-cyan-500 animate-pulse" />
-        <p className="text-muted-foreground animate-bounce">جاري تحليل بياناتك الأكاديمية والمهنية...</p>
+        <p className="text-muted-foreground animate-bounce">جاري استشارة المرشد الذكي...</p>
       </div>
     )
   }
 
+  // 1. عرض رسالة القيد (لو ممرش 24 ساعة)
+  if (data?.limitMessage) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center space-y-6" dir="rtl">
+        <div className="bg-yellow-500/10 p-6 rounded-full border border-yellow-500/20">
+          <Lock className="h-12 w-12 text-yellow-500" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-white font-arabic">المستشار في استراحة قصيرة</h2>
+          <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            {data.limitMessage}
+          </p>
+        </div>
+        <div className="flex gap-4">
+           <Button variant="outline" onClick={() => window.history.back()} className="border-white/10 hover:bg-white/5">العودة للرئيسية</Button>
+        </div>
+      </div>
+    )
+  }
+
+  // 2. معالجة حالة الخطأ العادية (لو البيانات ناقصة)
   if (!data || data.completionRate === undefined) {
     return (
       <div className="flex h-[80vh] flex-col items-center justify-center gap-4 text-center p-6">
         <AlertTriangle className="h-12 w-12 text-yellow-500" />
-        <p>لم نتمكن من الحصول على تحليل دقيق. تأكد من إدخال درجاتك في سجل المواد أولاً.</p>
+        <p>لم نتمكن من الحصول على تحليل دقيق. تأكد من إكمال سجلاتك الدراسية أولاً.</p>
         <Button onClick={loadAnalysis}>إعادة المحاولة</Button>
       </div>
     )
   }
 
+  // 3. عرض لوحة البيانات (Dashboard) في حالة النجاح
   return (
     <div className="space-y-8 p-4 md:p-8 pb-12" dir="rtl">
       {/* Header */}
@@ -69,7 +100,7 @@ export default function AIMentorPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* كارت نسبة الإنجاز - جديد */}
+        {/* كارت نسبة الإنجاز */}
         <Card className="md:col-span-3 border-none bg-gradient-to-l from-cyan-900/20 to-transparent">
           <CardContent className="p-6">
             <div className="flex justify-between items-end mb-4">
@@ -80,7 +111,7 @@ export default function AIMentorPage() {
           </CardContent>
         </Card>
 
-        {/* كارت التحليل الأكاديمي (الذي كان فارغاً) */}
+        {/* كارت ملخص الحالة الاستراتيجي */}
         <Card className="md:col-span-2 border-cyan-500/20 bg-cyan-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-cyan-500">
@@ -89,7 +120,6 @@ export default function AIMentorPage() {
           </CardHeader>
           <CardContent>
             <p className="text-lg leading-relaxed text-slate-200">
-              {/* تم تغيير المفتاح هنا إلى academicAnalysis ليطابق الـ Action */}
               {data.academicAnalysis}
             </p>
             {data.bottleneckCourse && (
@@ -110,7 +140,7 @@ export default function AIMentorPage() {
           </CardHeader>
           <CardContent>
              <p className="text-xs text-slate-300 leading-relaxed italic">
-               {data.careerRoadmap}
+               {data.careerRoadmap || "استكمل بياناتك المهنية للحصول على نصيحة مخصصة."}
              </p>
           </CardContent>
         </Card>

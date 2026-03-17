@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAcademicProfile } from "./academicActions"; // المصدر الوحيد للداتا
 import { coursesCatalog } from "./courses";
 import { auth } from "@clerk/nextjs/server";
+import { kv } from "@vercel/kv"; // الإضافة الجديدة للتحكم في الوقت
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -11,11 +12,29 @@ export async function getSmartAnalysis() {
   try {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
+    
+    // --- منطق قيد الـ 24 ساعة ---
+    const cooldownKey = `last_ai_analysis:${userId}`;
+    const lastAnalysis = await kv.get<number>(cooldownKey);
+    const now = Date.now();
+    const cooldownTime = 24 * 60 * 60 * 1000; // 24 ساعة بالمللي ثانية
+
+    if (lastAnalysis && (now - lastAnalysis < cooldownTime)) {
+      const remainingTime = cooldownTime - (now - lastAnalysis);
+      const hours = Math.floor(remainingTime / (1000 * 60 * 60));
+      const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+
+      return {
+        isLimitReached: true,
+        message: `المستشار في استراحة حالياً! يمكنك طلب تحليل جديد بعد ${hours} ساعة و ${minutes} دقيقة.`,
+        remainingTime
+      };
+    }
+    // ----------------------------
 
     // 1. جلب البروفايل اللي فيه كل الأترام والمواد
     const profile = await getAcademicProfile();
     
-    // لو البروفايل فاضي أو مفيش أترام، نرجع بيانات افتراضية بدل Null عشان الـ UI ما يضربش
     if (!profile || !profile.semesters || profile.semesters.length === 0) {
       return {
         completionRate: 0,
@@ -28,7 +47,7 @@ export async function getSmartAnalysis() {
     // 2. تجميع كل المحاولات من كل الأترام (Flattening)
     const allStudentRecords = profile.semesters.flatMap(sem => sem.courses);
 
-    // 3. تحديد المواد الناجحة (نفس منطق الكود بتاعك بالظبط)
+    // 3. تحديد المواد الناجحة
     const isPassed = (grade: string) => {
       const g = grade?.trim();
       return g && !['F', 'Fail', 'Taken', '-'].includes(g);
@@ -36,7 +55,6 @@ export async function getSmartAnalysis() {
 
     // 4. تصنيف المواد بناءً على الكتالوج وحالة الطالب
     const analyzedCatalog = coursesCatalog.map(course => {
-      // بنجيب آخر محاولة للمادة دي
       const attempts = allStudentRecords.filter(r => r.courseCode === course.code);
       const lastAttempt = attempts[attempts.length - 1];
       
@@ -91,7 +109,12 @@ export async function getSmartAnalysis() {
     
     const start = responseText.indexOf('{');
     const end = responseText.lastIndexOf('}') + 1;
-    return JSON.parse(responseText.substring(start, end));
+    const finalData = JSON.parse(responseText.substring(start, end));
+
+    // --- تحديث الطابع الزمني بعد نجاح التحليل فقط ---
+    await kv.set(cooldownKey, now);
+
+    return finalData;
 
   } catch (error) {
     console.error("AI Sync Error:", error);
