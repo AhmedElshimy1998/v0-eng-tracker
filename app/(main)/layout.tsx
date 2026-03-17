@@ -18,20 +18,20 @@ export default function MainLayout({
   return (
       <ClerkProvider>
           <div className="min-h-screen bg-background">
-                    {!hideNavigation && <AppSidebar />}
-                      
-                            {/* الـ Padding اليساري pl-64 يطبق فقط إذا لم تكن صفحة الهبوط */}
-                                  <main className={!hideNavigation ? "pl-64" : ""}>
-                                          <div className="container mx-auto max-w-7xl p-6 lg:p-8">
-                                                    {/* تغليف المحتوى بالحارس */}
-                                                    <ProfileGuard>
-                                                    {children}
-                                                    </ProfileGuard>
-                                                            </div>
-                                                                  </main>
+            {!hideNavigation && <AppSidebar />}
+              
+            {/* التعديل هنا: md:pl-64 للكمبيوتر بس، و pt-16 للموبايل */}
+            <main className={!hideNavigation ? "md:pl-64 pt-16 md:pt-0 transition-all duration-300" : ""}>
+              <div className="container mx-auto max-w-7xl p-6 lg:p-8">
+                {/* تغليف المحتوى بالحارس */}
+                <ProfileGuard>
+                  {children}
+                </ProfileGuard>
+              </div>
+            </main>
 
-                                                                        <Toaster richColors position="top-right" />
-                                                                            </div>
-                                                                              </ClerkProvider>
-                                                                              )
+            <Toaster richColors position="top-right" />
+          </div>
+      </ClerkProvider>
+  )
 }
