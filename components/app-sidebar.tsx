@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, settings } from "lucide-react"
+import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, Settings, Shield } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -14,6 +14,7 @@ const navigation = [
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap },
   { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Admin (اللائحة)", href: "/admin", icon: Shield },
 ]
 
 export function AppSidebar() {
