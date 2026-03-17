@@ -51,6 +51,8 @@ export interface Course {
   credits: number;              // عدد الساعات المعتمدة
   category: CourseCategory;     // تصنيف المادة
   prerequisites: string[];      // مصفوفة بأكواد المواد المتطلبة (لو مفيش بتبقى فاضية [])
+  idealSemester: string;        // الترم المثالي اللي المادة بتنزل فيه
+  department: string;           // القسم التابع ليه المادة (General, Mechatronics, الخ)
 }
 
 // هيكل المادة اللي الطالب سجلها بالفعل (تاريخ الطالب)

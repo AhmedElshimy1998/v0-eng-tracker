@@ -13,6 +13,7 @@ const navigation = [
   { name: "Subjects", href: "/subjects", icon: BookOpen },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap },
+  { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function AppSidebar() {
