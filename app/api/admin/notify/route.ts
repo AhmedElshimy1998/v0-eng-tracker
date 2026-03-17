@@ -38,19 +38,26 @@ export async function POST(req: Request) {
       const studentLevel = Math.floor(totalCredits / 32).toString();
       let isMatch = true;
 
-      // 1. فلترة القسم (بناءً على الـ ID الحقيقي)
-      if (filters.department !== "all" && profile.department !== filters.department) isMatch = false;
+      // 1. فلترة القسم (المقارنة بالاسم المسجل كما في لوحة الإدارة)
+      if (filters.department !== "all" && profile.department !== filters.department) {
+        isMatch = false;
+      }
 
       // 2. فلترة المستوى
-      if (isMatch && filters.level !== "all" && studentLevel !== filters.level) isMatch = false;
+      if (isMatch && filters.level !== "all" && studentLevel !== filters.level) {
+        isMatch = false;
+      }
 
       // 3. فلترة الخريجين
-      if (isMatch && filters.isSenior && totalCredits < 130) isMatch = false;
+      if (isMatch && filters.isSenior && totalCredits < 130) {
+        isMatch = false;
+      }
 
-      // 4. فلترة المادة (فحص دقيق)
+      // 4. فلترة المادة (تعديل منطق البحث ليكون أكثر مرونة مع المسميات الجديدة)
       if (isMatch && filters.courseName) {
-        const searchStr = filters.courseName.toLowerCase();
+        const searchStr = filters.courseName.toLowerCase().trim();
         const hasCourse = allRecords.some(c => {
+          // البحث في الكود المسجل عند الطالب أو جلب بيانات المادة من الكتالوج للمطابقة
           const courseInfo = coursesCatalog.find(cat => cat.code === c.courseCode);
           return c.courseCode.toLowerCase().includes(searchStr) || 
                  (courseInfo?.arabicName || "").includes(searchStr);
@@ -87,7 +94,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ 
       success: true, 
       sentCount: notificationsSent, 
-      targetedUsers: targetUserIds.length, // التأكد من إرجاع هذا الاسم للـ Alert
+      targetedUsers: targetUserIds.length, 
       logs: debugLogs 
     });
 
