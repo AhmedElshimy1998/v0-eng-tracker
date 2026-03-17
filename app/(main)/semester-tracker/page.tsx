@@ -105,6 +105,7 @@ export default function SemesterTrackerPage() {
   }
 
   return (
+    <TooltipProvider>
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <div>
@@ -246,31 +247,29 @@ export default function SemesterTrackerPage() {
                         statusBadge = <Lock className="h-4 w-4 text-muted-foreground" />;
                       }
                     }
-
-                                      // 1. بنعرف سبب الغلق الأول
-                                  const check = checkCanTake(course.code, allStudentRecords, coursesCatalog);
-                                  const lockReason = check.reason;
+                    // فحص حالة القفل والسبب
+                    const check = checkCanTake(course.code, allStudentRecords, coursesCatalog);
+                    const isLocked = !check.canTake && !attempt;
 
                     return (
-                      <TooltipProvider key={`${course.code}-${attempt?.id || 'ideal'}`}>
-                        <Tooltip delayDuration={300}>
-                          <TooltipTrigger asChild>
-                            <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all cursor-help ${cardStyle}`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="font-semibold text-sm text-right">{course.arabicName}</div>
-                                {statusBadge}
-                              </div>
-                              <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
+                      <Tooltip key={`${course.code}-${attempt?.id || 'ideal'}`} delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle} ${isLocked ? 'cursor-help' : ''}`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="font-semibold text-sm text-right">{course.arabicName}</div>
+                              {statusBadge}
                             </div>
-                          </TooltipTrigger>
-                          
-                          {/* 2. النافذة اللي بتظهر عند الوقوف بالماوس */}
-                          <TooltipContent className="bg-destructive text-white p-2 text-xs shadow-lg border-none z-[100] text-right max-w-[200px]">
-                            <p className="font-bold mb-1">المادة مغلقة: {course.arabicName} ({course.code})</p>
-                            <p>{lockReason}</p>
+                            <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
+                          </div>
+                        </TooltipTrigger>
+                        {isLocked && (
+                          <TooltipContent className="bg-destructive text-white p-2 text-xs shadow-xl border-none z-[100] text-right">
+                            <p className="font-bold border-b border-white/20 pb-1 mb-1">المادة مغلقة: {course.arabicName}</p>
+                            <p>الكود: {course.code}</p>
+                            <p className="mt-1 text-[10px] opacity-90">{check.reason}</p>
                           </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                        )}
+                      </Tooltip>
                     );
                   })}
                 </div>
@@ -386,5 +385,6 @@ export default function SemesterTrackerPage() {
         </TabsContent>
       </Tabs>
     </div>
+    <TooltipProvider/>
   );
 }
