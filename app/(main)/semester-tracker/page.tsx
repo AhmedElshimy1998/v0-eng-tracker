@@ -168,30 +168,21 @@ const level = getStudentLevel(completedCredits);
             <p className="text-xs text-muted-foreground">من أصل 4.00</p>
           </CardContent>
         </Card>
-        <Card className="relative overflow-hidden border-white/5">
-  {/* خط جانبي ملون لتمييز الـ Level */}
-  <div className={cn("absolute top-0 right-0 w-1 h-full opacity-50", level.color.split(' ')[1])} />
-  
-  <CardHeader className="flex flex-row items-center justify-between pb-2">
-    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-      الساعات المنجزة
-    </CardTitle>
+        <Card>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">الساعات المنجزة</CardTitle>
     <CheckCircle2 className="h-4 w-4 text-green-500" />
   </CardHeader>
-
   <CardContent>
-    <div className="flex items-baseline gap-1">
-      <span className="text-3xl font-black">{completedCredits}</span>
-      <span className="text-muted-foreground text-xs">/ 160 ساعة</span>
+    <div className="flex justify-between items-center">
+      <div className="text-2xl font-bold">{completedCredits}</div>
+    { /*
+      <Badge variant="outline" className="text-[10px] opacity-70 border-muted">
+        {level.label} Status
+      </Badge>
+      */ }
     </div>
-    
-    {/* الـ Level هنا كأنه "Sub-status" */}
-    <div className="mt-4 flex items-center gap-2">
-      <div className={cn("h-1.5 w-1.5 rounded-full animate-pulse", level.color.split(' ')[1])} />
-      <span className={cn("text-[10px] font-bold uppercase", level.color.split(' ')[0])}>
-        Current Status: {level.label}
-      </span>
-    </div>
+    <p className="text-xs text-muted-foreground">ساعة معتمدة بنجاح</p>
   </CardContent>
 </Card>
         <Card className="relative group cursor-pointer hover:border-red-500/50 transition-colors">
