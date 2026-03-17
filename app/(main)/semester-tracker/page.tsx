@@ -363,15 +363,32 @@ const completedCredits = useMemo(() => {
 
           <div className="grid gap-6 lg:grid-cols-2">
             {semesters.map((sem, semIndex) => {
-  const semStats = calculateGPA(sem.courses, coursesCatalog);
-  
-  // 1. حساب ساعات النجاح الفعلية لهذا الترم فقط
-  const passedCreditsInSem = sem.courses
-    .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade)) // فلتر النجاح
+  // 1. حساب ساعات التسجيل "النهائية" (فقط المواد التي حصلت على تقدير نهائي وليس Taken)
+  const finalizedRegistrationCredits = sem.courses
+    .filter(r => r.grade !== 'Taken' && r.grade !== '-') // استبعاد المواد قيد الدراسة
     .reduce((sum, r) => {
       const course = coursesCatalog.find(c => c.code === r.courseCode);
       return sum + (course?.credits || 0);
     }, 0);
+
+  // 2. حساب ساعات النجاح الفعلية لهذا الترم
+  const passedCreditsInSem = sem.courses
+    .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade)) 
+    .reduce((sum, r) => {
+      const course = coursesCatalog.find(c => c.code === r.courseCode);
+      return sum + (course?.credits || 0);
+    }, 0);
+
+  // 3. حساب ساعات المواد "قيد الدراسة" حالياً (إضافي للوضوح)
+  const currentOngoingCredits = sem.courses
+    .filter(r => r.grade === 'Taken')
+    .reduce((sum, r) => {
+      const course = coursesCatalog.find(c => c.code === r.courseCode);
+      return sum + (course?.credits || 0);
+    }, 0);
+
+  // نستخدم دالة GPA الأصلية للحسابات الرياضية
+  const semStats = calculateGPA(sem.courses, coursesCatalog);
 
   return (
     <Card key={sem.name}>
@@ -385,16 +402,26 @@ const completedCredits = useMemo(() => {
             </span>
             <span className="text-muted-foreground">|</span>
             
-            {/* ساعات التسجيل (الإجمالي) */}
+            {/* تسجيل نهائي (بدون الـ Taken) */}
             <span className="flex items-center gap-1">
-              التسجيل: <span className="font-bold text-blue-400">{semStats.totalCredits}</span>
+              التسجيل النهائي: <span className="font-bold text-blue-400">{finalizedRegistrationCredits}</span>
             </span>
             <span className="text-muted-foreground">|</span>
             
-            {/* ساعات النجاح (الفعلية) */}
+            {/* ساعات النجاح */}
             <span className="flex items-center gap-1">
               النجاح: <span className="font-bold text-green-500">{passedCreditsInSem}</span>
             </span>
+
+            {/* إظهار المواد الحالية لو موجودة */}
+            {currentOngoingCredits > 0 && (
+              <>
+                <span className="text-muted-foreground">|</span>
+                <span className="flex items-center gap-1">
+                  قيد الدراسة: <span className="font-bold text-yellow-500">{currentOngoingCredits}</span>
+                </span>
+              </>
+            )}
           </CardDescription>
         </div>
                     <Button variant="ghost" size="icon" onClick={() => {
