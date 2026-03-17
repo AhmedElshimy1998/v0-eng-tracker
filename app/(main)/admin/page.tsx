@@ -22,7 +22,9 @@ export default function AdminDashboardMain() {
               <CardTitle>إدارة اللائحة والأقسام</CardTitle>
               <CardDescription>إضافة وتعديل المواد، المتطلبات، وإدارة الأقسام الأكاديمية.</CardDescription>
             </CardHeader>
-          </CardContent>
+            <CardContent>
+              {/* أي محتوى إضافي ممكن يتحط هنا مستقبلاً */}
+            </CardContent>
           </Card>
         </Link>
 
@@ -35,6 +37,7 @@ export default function AdminDashboardMain() {
               <CardTitle>متابعة الطلاب</CardTitle>
               <CardDescription>عرض بيانات الطلاب، متابعة الأداء الفصلي، التراكمي، وحالة الإنذارات.</CardDescription>
             </CardHeader>
+            <CardContent></CardContent>
           </Card>
         </Link>
 
@@ -47,6 +50,7 @@ export default function AdminDashboardMain() {
               <CardTitle>إدارة الصلاحيات</CardTitle>
               <CardDescription>تعيين أو إزالة صلاحيات الإدارة (Admin) للمستخدمين المسجلين.</CardDescription>
             </CardHeader>
+            <CardContent></CardContent>
           </Card>
         </Link>
       </div>
