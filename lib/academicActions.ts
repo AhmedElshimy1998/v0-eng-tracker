@@ -67,3 +67,27 @@ export async function saveDepartments(departments: DepartmentItem[]) {
     return { success: false };
   }
 }
+
+// دالة جلب سجلات الطالب (المواد والتقديرات)
+export async function getStudentRecords() {
+  try {
+    const { userId } = await auth(); // استدعاء الأيدي من Clerk
+    if (!userId) return [];
+
+    // هنا بنجيب البيانات من الداتابيز عندك
+    // لو بتستخدم Prisma مثلاً، الكود هيكون شبه كده:
+    /*
+    const records = await prisma.studentRecord.findMany({
+      where: { userId: userId }
+    });
+    return records;
+    */
+
+    // مؤقتاً عشان الـ Build يشتغل والصفحة تفتح، رجع مصفوفة فاضية
+    // أو لو عندك متغير فيه البيانات، حطه هنا
+    return []; 
+  } catch (error) {
+    console.error("Error fetching student records:", error);
+    return [];
+  }
+}
