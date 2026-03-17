@@ -68,22 +68,3 @@ export async function saveDepartments(departments: DepartmentItem[]) {
   }
 }
 
-
-export async function getStudentRecords() {
-  try {
-    const { userId } = await auth();
-    if (!userId) return [];
-
-    // جلب البيانات باستخدام الـ Key الخاص بالمستخدم
-    // نستخدم التنسيق "student_records:user_2b..."
-    const records = await kv.get(`academic-profile-:${userId}`);
-
-    // لو مفيش سجلات، نرجع مصفوفة فاضية
-    if (!records) return [];
-
-    return records as any[];
-  } catch (error) {
-    console.error("Upstash KV Error:", error);
-    return [];
-  }
-}
