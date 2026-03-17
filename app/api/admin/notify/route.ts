@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import webpush from "web-push";
@@ -5,26 +7,32 @@ import { checkIsAdmin, getAllStudents } from "@/lib/adminActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
 
-// نفس إعدادات مفاتيح التشفير بتاعتك بالظبط
+// إعداد مفاتيح التشفير للتواصل مع المتصفح
 webpush.setVapidDetails(
   "mailto:admin@studyhub.com",
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string,
   process.env.VAPID_PRIVATE_KEY as string
 );
 
-// هنا استخدمنا POST عشان هنستقبل داتا من صفحة الأدمن (العنوان، الرسالة، الفئة)
 export async function POST(req: Request) {
   try {
-    // 1. التأكد إن اللي بيبعت الإشعار ده أدمن فعلاً
+    console.log("=== بداية إرسال إشعارات الإدارة ===");
+    
+    // 1. التحقق من الصلاحيات
     const isAdmin = await checkIsAdmin();
-    if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    if (!isAdmin) {
+      console.log("رفض: المستخدم ليس مديراً");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
 
-    // 2. استلام بيانات الإشعار من صفحة الأدمن
+    // 2. استلام البيانات
     const { title, message, audience } = await req.json();
+    console.log(`البيانات المستلمة - العنوان: ${title}, الفئة: ${audience}`);
+
     const students = await getAllStudents();
     let targetUserIds: string[] = [];
 
-    // 3. فلترة الطلاب بناءً على اختيارك (الكل، المنذرين، الخريجين، المستوى الصفري)
+    // 3. فلترة الطلاب (نفس الفكرة بتاعتك بس على مستوى الأدمن)
     if (audience === "all") {
       targetUserIds = students.map(s => s.userId);
     } else {
@@ -40,26 +48,46 @@ export async function POST(req: Request) {
       });
     }
 
-    let sentCount = 0;
-    const payload = JSON.stringify({ title: title, body: message, url: "/" });
+    console.log(`تم العثور على عدد (${targetUserIds.length}) مستخدم مطابق للفئة (${audience})`);
 
-    // 4. الدوران على الفئة المستهدفة وإرسال الإشعار
-    for (const uid of targetUserIds) {
-      // بنستخدم نفس المفتاح بتاعك اللي الطلبة متسجلين بيه
-      const subs: any[] = (await kv.get(`push-subscriptions-${uid}`)) || [];
-      for (const sub of subs) {
-        try {
-          await webpush.sendNotification(sub, payload);
-          sentCount++;
-        } catch (e) {
-          console.error(`Push error for ${uid}:`, e);
+    let notificationsSent = 0;
+    
+    // شكل الـ payload اللي بيستقبله ملف sw.js بتاعك بالظبط
+    const payload = JSON.stringify({
+      title: title || "تنبيه من الإدارة",
+      body: message,
+      url: "/"
+    });
+
+    // 4. الدوران على كل مستخدم وإرسال الإشعار
+    for (const userId of targetUserIds) {
+      console.log(`جاري فحص اشتراكات المستخدم: ${userId}`);
+      
+      // جلب "اشتراكات الإشعارات" الخاصة بهذا المستخدم فقط
+      const subscriptions: any[] = (await kv.get(`push-subscriptions-${userId}`)) || [];
+      
+      if (subscriptions.length > 0) {
+        console.log(`تم العثور على ${subscriptions.length} اشتراك للمستخدم ${userId}`);
+        
+        for (const sub of subscriptions) {
+          try {
+            await webpush.sendNotification(sub, payload);
+            console.log(`✅ نجاح: تم إرسال الإشعار لجهاز المستخدم ${userId}`);
+            notificationsSent++;
+          } catch (err) {
+            console.error(`❌ فشل: خطأ أثناء الإرسال للمستخدم ${userId}:`, err);
+          }
         }
+      } else {
+        console.log(`لم يتم العثور على اشتراكات (أجهزة مفعلة) للمستخدم ${userId}`);
       }
     }
 
-    return NextResponse.json({ success: true, sentCount, targetedUsers: targetUserIds.length });
-  } catch (error) {
-    console.error("Admin Notify Error:", error);
-    return NextResponse.json({ error: "Failed to send notifications" }, { status: 500 });
+    console.log(`=== انتهاء: تم إرسال ${notificationsSent} إشعار بنجاح ===`);
+    return NextResponse.json({ success: true, sentCount: notificationsSent, targetedUsers: targetUserIds.length });
+
+  } catch (error: any) {
+    console.error("خطأ عام في API الإشعارات:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
