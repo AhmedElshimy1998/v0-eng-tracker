@@ -81,7 +81,7 @@ export async function getSmartAnalysis() {
         "battlePlan": [
           { "code": "كود", "name": "اسم المادة", "priority": "High/Medium", "reason": "لماذا؟" }
         ],
-        "careerRoadmap": "نصيحة مهنية تربط دراسته بعمله كفني هندسي في AstraZeneca"
+        "careerRoadmap": ""
       }
     `;
 
