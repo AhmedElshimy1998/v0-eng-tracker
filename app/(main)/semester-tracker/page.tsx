@@ -248,7 +248,7 @@ export default function SemesterTrackerPage() {
                       }
                     }
                     // فحص حالة القفل والسبب
-                    const check = checkCanTake(course.code, allStudentRecords, coursesCatalog);
+                    const check = checkCanTake([course.code], allStudentRecords, coursesCatalog);
                     const isLocked = !check.canTake && !attempt;
 
                     return (
