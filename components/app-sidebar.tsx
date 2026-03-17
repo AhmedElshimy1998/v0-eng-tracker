@@ -6,11 +6,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { GraduationCap } from "lucide-react"; // استيراد أيقونة مناسبة للترمات
+
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Subjects", href: "/subjects", icon: BookOpen },
   { name: "Calendar", href: "/calendar", icon: Calendar },
+  { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap },
 ]
 
 export function AppSidebar() {

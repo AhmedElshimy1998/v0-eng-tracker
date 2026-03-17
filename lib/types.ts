@@ -1,71 +1,72 @@
-export type LectureStatus = "not-started" | "in-progress" | "completed"
-
-export interface Task {
+// ==========================================
+// 1. الأنواع الأساسية الحالية للموقع (لا تحذفها)
+// ==========================================
+export interface Property {
   id: string
   title: string
-  completed: boolean
+  type: "Apartment" | "House" | "Villa" | "Commercial"
+  price: number
+  location: string
+  bedrooms: number
+  bathrooms: number
+  area: number
+  image: string
+  featured?: boolean
 }
 
-export interface Resource {
-  id: string
-  title: string
-  url: string
-  type: "youtube" | "drive" | "pdf" | "link"
+export interface User {
+  name: string
+  email: string
+  avatar: string
 }
 
-export interface Lecture {
-  id: string
-  title: string
-  type: "lecture" | "lab"
-  status: LectureStatus
-  notes: string
-  resources: Resource[]
-  tasks: Task[]
-  order: number
+// ==========================================
+// 2. الأنواع الجديدة الخاصة بنظام تتبع الدرجات (GPA Tracker)
+// ==========================================
+
+// أنواع التقديرات المتاحة بناءً على نظام الكلية
+export type Grade = 
+  | 'A+' | 'A' | 'A-' 
+  | 'B+' | 'B' | 'B-' 
+  | 'C+' | 'C' | 'C-' 
+  | 'D+' | 'D' 
+  | 'F' | 'Fail' 
+  | 'Taken' | '-';
+
+// تصنيفات المواد لسهولة الفلترة في الداشبورد
+export type CourseCategory = 
+  | 'متطلبات جامعة (إجباري)'
+  | 'متطلبات جامعة (اختياري)'
+  | 'متطلبات كلية (إجباري)'
+  | 'متطلبات كلية (اختياري)'
+  | 'متطلبات التخصص (إجباري)'
+  | 'تخصص (اختياري عام)'
+  | 'تخصص دقيق (اختياري)';
+
+// هيكل المادة في اللائحة (الخطة المثالية)
+export interface Course {
+  code: string;                 // كود المادة (مثل EMP 011)
+  arabicName: string;           // الاسم بالعربي
+  englishName: string;          // الاسم بالإنجليزي
+  credits: number;              // عدد الساعات المعتمدة
+  category: CourseCategory;     // تصنيف المادة
+  prerequisites: string[];      // مصفوفة بأكواد المواد المتطلبة (لو مفيش بتبقى فاضية [])
 }
 
-export interface Exam {
-  id: string
-  title: string
-  type: "midterm" | "final" | "quiz"
-  date: string
-  grade?: number
-  maxGrade: number
+// هيكل المادة اللي الطالب سجلها بالفعل (تاريخ الطالب)
+export interface StudentCourseRecord {
+  id: string;                   // ID فريد للريكورد عشان لو عاد المادة
+  courseCode: string;           // كود المادة المرتبطة
+  semester: string;             // الترم اللي اتسجلت فيه (مثل Level One - Term 1)
+  grade: Grade;                 // التقدير اللي جابه
+  points: number;               // النقط اللي بتتحسب بناء على التقدير
+  isRetake: boolean;            // هل دي إعادة لمادة قديمة؟ (عشان لوجيك اللائحة)
 }
 
-export interface Subject {
-  id: string
-  title: string
-  code: string
-  color: string
-  lectures: Lecture[]
-  exams: Exam[]
-  schedules: Schedule[]
-}
-
-export interface Deadline {
-  id: string
-  subjectId: string
-  title: string
-  type: "exam" | "assignment"
-  date: string
-}
-
-export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6 // Sunday = 0, Saturday = 6
-
-export interface Schedule {
-  id: string
-  dayOfWeek: DayOfWeek
-  time: string // "HH:MM" format (24-hour)
-  location?: string
-}
-
-export interface ScheduledNotification {
-  id: string
-  subjectId: string
-  subjectTitle: string
-  scheduleId: string
-  scheduledTime: Date
-  minutesBefore: number
-  acknowledged: boolean
+// هيكل الترم الواحد عشان نحسب الـ Semester GPA
+export interface SemesterData {
+  name: string;
+  courses: StudentCourseRecord[];
+  semesterGpa: number;
+  semesterCredits: number;
 }
