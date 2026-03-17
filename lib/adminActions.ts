@@ -69,3 +69,43 @@ export async function toggleAdminStatus(targetUserId: string, makeAdmin: boolean
     return { success: false };
   }
 }
+
+// --- ضف الكود ده في آخر ملف lib/adminActions.ts ---
+
+// 4. جلب قائمة الـ IDs الخاصة بالمديرين
+export async function getSiteAdmins(): Promise<string[]> {
+  try {
+    return await kv.get<string[]>('site-admins') || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// 5. الحذف النهائي للمستخدم (من Clerk ومن Upstash)
+export async function deleteUserAccount(targetUserId: string) {
+  try {
+    const isAdmin = await checkIsAdmin();
+    if (!isAdmin) throw new Error("غير مصرح لك بإجراء هذا التعديل");
+
+    // 1. الحذف من نظام التوثيق Clerk
+    const client = await clerkClient();
+    await client.users.deleteUser(targetUserId);
+
+    // 2. مسح كل الداتا بتاعته من قاعدة بيانات Upstash
+    await kv.del(`academic-profile-${targetUserId}`);
+    await kv.del(`studyhub-cloud-data-${targetUserId}`); // داتا المذاكرة
+    await kv.del(`push-subscriptions-${targetUserId}`);  // داتا الإشعارات
+
+    // 3. لو كان أدمن، نمسحه من مصفوفة الأدمنز
+    let admins = await kv.get<string[]>('site-admins') || [];
+    if (admins.includes(targetUserId)) {
+      admins = admins.filter(id => id !== targetUserId);
+      await kv.set('site-admins', admins);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting user:", error);
+    return { success: false, error: error.message };
+  }
+}
