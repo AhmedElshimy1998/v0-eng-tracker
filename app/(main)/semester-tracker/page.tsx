@@ -7,6 +7,13 @@ import { Calculator, AlertTriangle, CheckCircle2, XCircle, Lock, Plus, Trash2, L
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import { calculateGPA, checkCanTake, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses"; 
 import { SemesterData, Grade } from "@/lib/types";
@@ -240,14 +247,30 @@ export default function SemesterTrackerPage() {
                       }
                     }
 
+                                      // 1. بنعرف سبب الغلق الأول
+                                  const check = checkCanTake(course.code, allStudentRecords, coursesCatalog);
+                                  const lockReason = check.reason;
+
                     return (
-                      <div key={`${course.code}-${attempt?.id || 'ideal'}`} className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle}`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="font-semibold text-sm">{course.arabicName}</div>
-                          {statusBadge}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{course.code} • {course.credits} ساعة</div>
-                      </div>
+                      <TooltipProvider key={`${course.code}-${attempt?.id || 'ideal'}`}>
+                        <Tooltip delayDuration={300}>
+                          <TooltipTrigger asChild>
+                            <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all cursor-help ${cardStyle}`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="font-semibold text-sm text-right">{course.arabicName}</div>
+                                {statusBadge}
+                              </div>
+                              <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
+                            </div>
+                          </TooltipTrigger>
+                          
+                          {/* 2. النافذة اللي بتظهر عند الوقوف بالماوس */}
+                          <TooltipContent className="bg-destructive text-white p-2 text-xs shadow-lg border-none z-[100] text-right max-w-[200px]">
+                            <p className="font-bold mb-1">المادة مغلقة: {course.arabicName} ({course.code})</p>
+                            <p>{lockReason}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     );
                   })}
                 </div>
