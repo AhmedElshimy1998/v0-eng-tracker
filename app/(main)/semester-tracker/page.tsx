@@ -13,7 +13,8 @@ import { SemesterData, Grade } from "@/lib/types";
 import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
 
 export default function SemesterTrackerPage() {
-  const [studentDeptName, setStudentDeptName] = useState<string>("");
+  const [studentDept, setStudentDept] = useState<string>("");
+  const [actualDeptName, setActualDeptName] = useState<string>("");
   const [semesters, setSemesters] = useState<SemesterData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -23,12 +24,12 @@ export default function SemesterTrackerPage() {
         getAcademicProfile(),
         getDepartments()
       ]);
-
+      
       if (data) {
-        // --- التعديل هنا لربط الاسم العربي للقسم ---
-        const studentDeptId = data.department || "";
-        const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
-        setStudentDeptName(deptObject ? deptObject.name : "لم يحدد بعد");
+        setStudentDept(data.department || "");
+        // استخراج الاسم العربي للقسم للمطابقة
+        const deptObject = allDepts.find((d: DepartmentItem) => d.id === data.department);
+        if (deptObject) setActualDeptName(deptObject.name);
         
         if (data.semesters) setSemesters(data.semesters);
       }
@@ -55,14 +56,14 @@ export default function SemesterTrackerPage() {
     [effectiveRecords]
   );
 
-  // --- التعديل هنا لفلترة المواد بناءً على الاسم العربي والمواد العامة ---
+  // --- تعديل منطق الفلترة فقط ليدعم الأسماء العربية والمواد العامة ---
   const availableCourses = useMemo(() => {
     return coursesCatalog.filter(c => 
-      c.department === studentDeptName || 
+      c.department === actualDeptName || 
       c.department === "المواد العامة (جامعة/كلية)" ||
       c.department === "General"
     );
-  }, [studentDeptName]);
+  }, [actualDeptName]);
 
   const addSemester = () => {
     const newSem: SemesterData = {
@@ -80,14 +81,14 @@ export default function SemesterTrackerPage() {
   );
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6" dir="rtl">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="text-right">
-          <h2 className="text-3xl font-bold tracking-tight">متابع الفصول الدراسية</h2>
-          <p className="text-muted-foreground text-sm">خطط لفصولك الدراسية وشاهد تأثيرها على معدلك التراكمي فوراً.</p>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-right">متابع الفصول الدراسية</h2>
+          <p className="text-muted-foreground text-sm text-right">خطط لفصولك الدراسية وشاهد تأثيرها على معدلك التراكمي فوراً.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={addSemester} className="gap-2 bg-primary text-primary-foreground font-bold">
+          <Button onClick={addSemester} className="gap-2">
             <Plus className="h-4 w-4" /> إضافة فصل دراسي
           </Button>
         </div>
@@ -95,9 +96,9 @@ export default function SemesterTrackerPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="md:col-span-1 bg-primary/5 border-primary/20 h-fit sticky top-6">
-          <CardHeader className="pb-2 text-right">
-            <CardTitle className="text-sm font-medium flex items-center gap-2 justify-end">
-              الملخص الأكاديمي <Calculator className="h-4 w-4 text-primary" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-primary" /> الملخص الأكاديمي
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-center">
@@ -106,11 +107,8 @@ export default function SemesterTrackerPage() {
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">المعدل التراكمي (GPA)</p>
             </div>
             <div className="pt-4 border-t border-primary/10 flex justify-between items-center text-sm font-medium">
-              <span className="text-primary">{totalCredits}</span>
               <span className="text-muted-foreground">إجمالي الساعات</span>
-            </div>
-            <div className="text-[10px] text-right text-muted-foreground pt-1 border-t border-primary/10">
-              القسم: {studentDeptName}
+              <span className="text-primary">{totalCredits}</span>
             </div>
           </CardContent>
         </Card>
@@ -122,17 +120,17 @@ export default function SemesterTrackerPage() {
               return (
                 <Card key={sem.id} className="border-muted-foreground/10 shadow-sm overflow-hidden">
                   <CardHeader className="bg-muted/30 py-3 px-4 flex flex-row items-center justify-between space-y-0">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => {
-                      if(confirm("حذف هذا الفصل الدراسي؟")) saveSemestersToCloud(semesters.filter(s => s.id !== sem.id));
-                    }}><Trash2 className="h-3 w-3" /></Button>
                     <div className="text-right">
                       <CardTitle className="text-sm font-bold">{sem.title}</CardTitle>
                       <CardDescription className="text-[10px]">المعدل: {semGPA.gpa.toFixed(2)}</CardDescription>
                     </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => {
+                      if(confirm("حذف هذا الفصل الدراسي؟")) saveSemestersToCloud(semesters.filter(s => s.id !== sem.id));
+                    }}><Trash2 className="h-3 w-3" /></Button>
                   </CardHeader>
                   <CardContent className="p-3 space-y-2">
                      <select 
-                       className="w-full text-xs p-2 border rounded bg-background mb-2 text-right"
+                       className="w-full text-xs p-2 border rounded bg-background mb-2"
                        onChange={(e) => {
                          const code = e.target.value;
                          if(!code) return;
@@ -157,9 +155,9 @@ export default function SemesterTrackerPage() {
                        const course = coursesCatalog.find(c => c.code === record.courseCode);
                        return (
                          <div key={record.id} className="flex items-center justify-between p-2 rounded bg-muted/20 border border-transparent hover:border-muted-foreground/10 transition-all">
-                           <div className="flex-1 text-right">
-                             <div className="text-xs font-bold">{course?.arabicName}</div>
-                             <div className="text-[9px] text-muted-foreground">{record.courseCode} • {course?.credits} س</div>
+                           <div className="flex-1">
+                             <div className="text-xs font-bold text-right">{course?.arabicName}</div>
+                             <div className="text-[9px] text-muted-foreground text-right">{record.courseCode} • {course?.credits} س</div>
                            </div>
                            <select 
                              className="text-[10px] font-bold bg-transparent border-none focus:ring-0 cursor-pointer"
