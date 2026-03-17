@@ -67,9 +67,14 @@ export async function saveDepartments(departments: DepartmentItem[]) {
     return { success: false };
   }
 }
-academic-profile-
-// دالة جلب سجلات الطالب (المواد والتقديرات)
-// جلب البيانات باستخدام الـ Key الخاص بالمستخدم
+
+
+export async function getStudentRecords() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    // جلب البيانات باستخدام الـ Key الخاص بالمستخدم
     // نستخدم التنسيق "student_records:user_2b..."
     const records = await kv.get(`academic-profile-:${userId}`);
 
