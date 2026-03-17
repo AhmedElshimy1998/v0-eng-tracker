@@ -3,9 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import webpush from "web-push";
-import { checkIsAdmin, getAllStudents } from "@/lib/adminActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
-import { coursesCatalog } from "@/lib/courses";
+import { checkIsAdmin } from "@/lib/adminActions";
 
 webpush.setVapidDetails(
   "mailto:admin@studyhub.com",
@@ -16,70 +14,47 @@ webpush.setVapidDetails(
 export async function POST(req: Request) {
   const debugLogs: string[] = [];
   try {
-    debugLogs.push("1. بدء تشغيل API الإشعارات.");
-    
     const isAdmin = await checkIsAdmin();
-    if (!isAdmin) {
-      debugLogs.push("❌ رفض: المستخدم ليس مديراً.");
-      return NextResponse.json({ error: "Unauthorized", logs: debugLogs }, { status: 403 });
-    }
-    debugLogs.push("2. تم التحقق من صلاحيات المدير بنجاح.");
+    if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
     const { title, message, audience } = await req.json();
-    debugLogs.push(`3. استلام البيانات: الفئة [${audience}].`);
+    debugLogs.push(`1. استلام طلب إرسال لـ: ${audience}`);
 
-    const students = await getAllStudents();
-    debugLogs.push(`4. تم جلب ${students.length} طالب من قاعدة البيانات.`);
+    // --- الطريقة المضمونة: البحث عن الاشتراكات مباشرة مثل الكود الشغال عندك ---
+    const subscriptionKeys = await kv.keys("push-subscriptions-*");
+    debugLogs.push(`2. تم العثور على ${subscriptionKeys.length} مفتاح اشتراك في الداتا بيز.`);
 
-    let targetUserIds: string[] = [];
-
-    if (audience === "all") {
-      targetUserIds = students.map(s => s.userId);
-    } else {
-      students.forEach(student => {
-        const semesters = student.profile.semesters || [];
-        const allRecords = semesters.flatMap((s: any) => s.courses);
-        const effectiveRecords = getEffectiveRecords(allRecords);
-        const { gpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
-
-        if (audience === "risk" && gpa < 2.0 && totalCredits > 0) targetUserIds.push(student.userId);
-        if (audience === "seniors" && totalCredits >= 130) targetUserIds.push(student.userId);
-        if (audience === "level_0" && totalCredits < 32) targetUserIds.push(student.userId);
-      });
-    }
-
-    debugLogs.push(`5. عدد الطلاب المطابقين للفئة: ${targetUserIds.length}`);
-
-    let notificationsSent = 0;
+    let sentCount = 0;
     const payload = JSON.stringify({
-      title: title || "تنبيه من الإدارة",
+      title: title || "تنبيه Engineering Tracker",
       body: message,
       url: "/"
     });
 
-    for (const userId of targetUserIds) {
-      const subscriptions: any[] = (await kv.get(`push-subscriptions-${userId}`)) || [];
+    for (const key of subscriptionKeys) {
+      const userId = key.replace("push-subscriptions-", "");
+      
+      // هنا ممكن نضيف فلترة الـ audience لو حبيت، بس خلينا نجرب نبعت لـ "الكل" الأول عشان نتأكد
+      // لو audience === "all" هنبعت للكل فعلاً
+      
+      const subscriptions: any[] = (await kv.get(key)) || [];
+      
       if (subscriptions.length > 0) {
-        debugLogs.push(`- المستخدم ${userId}: تم العثور على ${subscriptions.length} جهاز/اشتراك.`);
+        debugLogs.push(`- جاري الإرسال للمستخدم ${userId} (${subscriptions.length} جهاز)`);
         for (const sub of subscriptions) {
           try {
             await webpush.sendNotification(sub, payload);
-            notificationsSent++;
-            debugLogs.push(`  ✔️ نجاح إرسال لجهاز تبع ${userId}`);
+            sentCount++;
           } catch (err: any) {
-            debugLogs.push(`  ❌ فشل إرسال لجهاز تبع ${userId} السبب: ${err.message}`);
+            debugLogs.push(`  ❌ فشل لجهاز ${userId}: ${err.message}`);
           }
         }
-      } else {
-        debugLogs.push(`- المستخدم ${userId}: ليس لديه أي اشتراك إشعارات.`);
       }
     }
 
-    debugLogs.push(`6. انتهت العملية. إجمالي الأجهزة المستلمة: ${notificationsSent}`);
-    return NextResponse.json({ success: true, sentCount: notificationsSent, targetedUsers: targetUserIds.length, logs: debugLogs });
+    return NextResponse.json({ success: true, sentCount, logs: debugLogs });
 
   } catch (error: any) {
-    debugLogs.push(`❌ خطأ عام: ${error.message}`);
-    return NextResponse.json({ success: false, error: error.message, logs: debugLogs }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message, logs: [error.message] }, { status: 500 });
   }
 }
