@@ -247,54 +247,57 @@ export default function SemesterTrackerPage() {
                         statusBadge = <Lock className="h-4 w-4 text-muted-foreground" />;
                       }
                     }
-                    // فحص حالة القفل والسبب
                     // 1. فحص حالة القفل والسبب
-                          const check = checkCanTake(course.prerequisites, allStudentRecords);
-                          const isLocked = !check.canTake && !attempt;
+                    const check = checkCanTake([course.code], allStudentRecords, coursesCatalog);
+                    const isLocked = !check.canTake && !attempt;
 
-                          // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في الـ Tooltip
-                          const prereqDetails = course.prerequisites.map(pCode => {
-                            const pInfo = coursesCatalog.find(c => c.code === pCode);
-                            return `${pInfo?.arabicName || pCode} (${pCode})`;
-                          }).join(" - ");
+                    // 2. تجهيز أسماء المتطلبات بالعربي
+                    const prereqDetails = course.prerequisites.map(pCode => {
+                      const pInfo = coursesCatalog.find(c => c.code === pCode);
+                      return `${pInfo?.arabicName || pCode} (${pCode})`;
+                    }).join(" - ");
 
-                                          return (
-                        <Tooltip key={`${course.code}-${attempt?.id || 'ideal'}`} delayDuration={200}>
-                          <TooltipTrigger asChild>
-                            <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle} ${isLocked ? 'cursor-help' : ''}`}>
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="font-semibold text-sm text-right">{course.arabicName}</div>
-                                {statusBadge}
-                              </div>
-                              <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
+                    // 3. محتوى الكارت (الـ UI الثابت)
+                    const CardContent = (
+                      <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle} ${isLocked ? 'cursor-help' : 'cursor-default'}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-semibold text-sm text-right">{course.arabicName}</div>
+                          {statusBadge}
+                        </div>
+                        <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
+                      </div>
+                    );
+
+                    // 4. المنطق: لو مغلقة حط Tooltip، لو مش مغلقة رجع الكارت عادي
+                    if (!isLocked) {
+                      return <div key={`${course.code}-${attempt?.id || 'ideal'}`}>{CardContent}</div>;
+                    }
+
+                    return (
+                      <Tooltip key={`${course.code}-${attempt?.id || 'ideal'}`} delayDuration={200}>
+                        <TooltipTrigger asChild>
+                          {CardContent}
+                        </TooltipTrigger>
+                        
+                        <TooltipContent 
+                          side="top" 
+                          className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[100] min-w-[250px] text-right"
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-red-500 font-bold border-b border-white/10 pb-2">
+                              <span>⛔ انتبه: المادة مغلقة</span>
                             </div>
-                          </TooltipTrigger>
-                          
-                          {isLocked && (
-                            <TooltipContent 
-                              side="top" 
-                              className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[100] min-w-[250px] text-right"
-                            >
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-2 text-red-500 font-bold border-b border-white/10 pb-2">
-                                  <span>⛔ انتبه: المادة مغلقة</span>
-                                </div>
-                                
-                                <div className="space-y-1">
-                                  <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
-                                  <p className="text-sm font-semibold text-slate-100 leading-relaxed">
-                                    {prereqDetails || "متطلب سابق غير محدد"}
-                                  </p>
-                                </div>
-                                
-                                <div className="pt-1 border-t border-white/5">
-                                  <p className="text-[10px] text-muted-foreground italic">تفتح المادة تلقائياً بمجرد نجاحك في المتطلبات أعلاه.</p>
-                                </div>
-                              </div>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      );
+                            
+                            <div className="space-y-1">
+                              <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
+                              <p className="text-sm font-semibold text-slate-100 leading-relaxed">
+                                {prereqDetails || "متطلب سابق غير محدد"}
+                              </p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
                   })}
                 </div>
               </div>
