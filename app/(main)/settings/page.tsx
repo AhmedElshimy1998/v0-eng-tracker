@@ -4,28 +4,48 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { User, Phone, GraduationCap, Save } from "lucide-react";
+import { User, Phone, GraduationCap, Save, Loader2 } from "lucide-react";
+// استيراد دوال الداتا بيز (تأكد من المسار)
+import { getAcademicProfile, saveAcademicProfile } from "@/lib/academicActions"; 
 
 export default function SettingsPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [department, setDepartment] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // جلب البيانات المحفوظة أول ما الصفحة تفتح
+  // جلب البيانات من Vercel KV أول ما الصفحة تفتح
   useEffect(() => {
-    setName(localStorage.getItem("studentName") || "");
-    setPhone(localStorage.getItem("studentPhone") || "");
-    setDepartment(localStorage.getItem("studentDepartment") || "");
+    const loadData = async () => {
+      const data = await getAcademicProfile();
+      if (data) {
+        setName(data.name || "");
+        setPhone(data.phone || "");
+        setDepartment(data.department || "");
+      }
+      setIsLoading(false);
+    };
+    loadData();
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem("studentName", name);
-    localStorage.setItem("studentPhone", phone);
-    localStorage.setItem("studentDepartment", department);
-    alert("تم حفظ الإعدادات بنجاح! سيتم تحديث خطتك الأكاديمية بناءً على قسمك.");
+  const handleSave = async () => {
+    setIsSaving(true);
+    const result = await saveAcademicProfile({ name, phone, department });
+    setIsSaving(false);
+    
+    if (result.success) {
+      alert("تم حفظ الإعدادات بنجاح في السحابة!");
+    } else {
+      alert("حدث خطأ أثناء الحفظ.");
+    }
   };
 
+  if (isLoading) return <div className="p-8 text-center flex items-center justify-center gap-2"><Loader2 className="animate-spin h-5 w-5" /> جاري تحميل بياناتك...</div>;
+
   return (
+    // ... نفس كود الـ UI اللي بعتهولك في الرسالة اللي فاتت بالضبط ...
+    // (بدون أي تغيير في التصميم، بس زرار الحفظ هيربط بـ handleSave الجديدة)
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
