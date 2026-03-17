@@ -67,27 +67,18 @@ export async function saveDepartments(departments: DepartmentItem[]) {
     return { success: false };
   }
 }
-
+academic-profile-
 // دالة جلب سجلات الطالب (المواد والتقديرات)
-export async function getStudentRecords() {
-  try {
-    const { userId } = await auth(); // استدعاء الأيدي من Clerk
-    if (!userId) return [];
+// جلب البيانات باستخدام الـ Key الخاص بالمستخدم
+    // نستخدم التنسيق "student_records:user_2b..."
+    const records = await kv.get(`academic-profile-:${userId}`);
 
-    // هنا بنجيب البيانات من الداتابيز عندك
-    // لو بتستخدم Prisma مثلاً، الكود هيكون شبه كده:
-    /*
-    const records = await prisma.studentRecord.findMany({
-      where: { userId: userId }
-    });
-    return records;
-    */
+    // لو مفيش سجلات، نرجع مصفوفة فاضية
+    if (!records) return [];
 
-    // مؤقتاً عشان الـ Build يشتغل والصفحة تفتح، رجع مصفوفة فاضية
-    // أو لو عندك متغير فيه البيانات، حطه هنا
-    return []; 
+    return records as any[];
   } catch (error) {
-    console.error("Error fetching student records:", error);
+    console.error("Upstash KV Error:", error);
     return [];
   }
 }
