@@ -1,12 +1,10 @@
 "use server"
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getStudentRecords, getAcademicProfile } from "./academicActions";
-import { getAdvisingNotes } from "./adminActions"; 
+import { getAcademicProfile } from "./academicActions"; // المصدر الأساسي
 import { coursesCatalog } from "./courses";
 import { auth } from "@clerk/nextjs/server";
 
-// تهيئة محرك الذكاء الاصطناعي
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function getSmartAnalysis() {
@@ -14,93 +12,57 @@ export async function getSmartAnalysis() {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
-    // 1. جلب كافة البيانات من مصادرها المختلفة في الداتا بيز
-    const [records, profile, advisorNotes] = await Promise.all([
-      getStudentRecords(), // سجل درجاتك الحالية
-      getAcademicProfile(), // بروفايلك الأكاديمي وقسمك
-      getAdvisingNotes(userId) // ملاحظات المرشد الأكاديمي (الإدمن)
-    ]);
+    // 1. سحب البروفايل كامل (اللي فيه السيمسترات والمواد)
+    const profile = await getAcademicProfile();
+    if (!profile || !profile.semesters) return null;
 
-    // 2. معالجة منطق المواد (مكتملة، مفتوحة، مغلقة) بناءً على المتطلبات
-    const completedCodes = new Set(
-      records.filter(r => r.grade !== 'F' && r.grade !== '-').map(r => r.courseCode)
+    // 2. تجميع كل المواد من كل الأترام في مصفوفة واحدة "فلات"
+    const allRecords = profile.semesters.flatMap(sem => sem.courses);
+
+    // 3. تطبيق منطق النجاح والرسوب (نفس منطق الصفحة عندك)
+    const normalize = (g: any) => g?.toString().trim();
+    
+    const passedCodes = new Set(
+      allRecords.filter(r => !['F', 'Fail', 'Taken', '-'].includes(normalize(r.grade))).map(r => r.courseCode)
     );
 
-    const processedCatalog = coursesCatalog.map(course => {
-      const isCompleted = completedCodes.has(course.code);
-      // المادة تفتح فقط إذا اكتملت كافة متطلباتها السابقة
-      const canOpen = course.prerequisites.every(p => completedCodes.has(p));
-      
+    const currentlyTaking = allRecords.filter(r => normalize(r.grade) === 'Taken');
+
+    // 4. تحليل حالة الكتالوج بالكامل
+    const analyzedCatalog = coursesCatalog.map(course => {
+      const record = allRecords.find(r => r.courseCode === course.code);
+      const isPassed = passedCodes.has(course.code);
+      const canTake = course.prerequisites.every(p => passedCodes.has(p));
+
       return {
         code: course.code,
         name: course.arabicName,
-        status: isCompleted ? 'completed' : (canOpen ? 'open' : 'locked'),
-        prerequisites: course.prerequisites,
-        credits: course.credits,
-        currentGrade: records.find(r => r.courseCode === course.code)?.grade || null
+        status: isPassed ? 'passed' : (normalize(record?.grade) === 'Taken' ? 'taking' : (canTake ? 'open' : 'locked')),
+        grade: record?.grade || null
       };
     });
 
-    // 3. تجهيز سياق البيانات لـ AI
-    const studentContext = {
-      name: profile?.name || "طالب هندسة",
-      department: profile?.department || "عام",
-      targetPlan: profile?.semesters || [], // الخطة المثالية التي رتبتها بنفسك
-      stats: {
-        completed: processedCatalog.filter(c => c.status === 'completed'),
-        available: processedCatalog.filter(c => c.status === 'open'),
-        locked: processedCatalog.filter(c => c.status === 'locked')
-      },
-      advisorRemarks: advisorNotes // الملاحظات التي كتبها لك الإدمن
-    };
-
-    // 4. صياغة الـ Prompt الهندسي
+    // 5. الـ Prompt دلوقتي بقى مبني على "واقع" الداتا بيز
     const prompt = `
-      بصفتك المرشد الأكاديمي الذكي لمنصة هندسية، حلل بروفايل الطالب ${studentContext.name}:
+      أنت المرشد الأكاديمي للطالب ${profile.name} في قسم ${profile.department}.
       
-      المعطيات:
-      - القسم التخصصي: ${studentContext.department}
-      - إنجاز الطالب: تم اجتياز ${studentContext.stats.completed.length} مادة من أصل ${coursesCatalog.length}.
-      - المواد المتاحة للتسجيل فوراً: ${JSON.stringify(studentContext.stats.available)}
-      - المواد المغلقة حالياً: ${JSON.stringify(studentContext.stats.locked)}
-      - الخطة التي يطمح لها الطالب: ${JSON.stringify(studentContext.targetPlan)}
-      - ملاحظات المرشد البشري: ${studentContext.advisorRemarks}
-
-      المطلوب (رد بصيغة JSON فقط):
-      1. احسب "نسبة الإنجاز" (completionRate) بناءً على الساعات المعتمدة.
-      2. حدد "عنق الزجاجة" (bottleneckCourse): مادة مفتوحة حالياً لو تأخرت ستغلق خلفها مسارات كثيرة.
-      3.AcademicAnalysis: تحليل لنقاط القوة (مثل التميز في مواد البرمجة أو الميكانيكا).
-      4.BattlePlan: اقتراح لـ 5 مواد للترم القادم توازن بين الصعوبة وبين "الخطة المثالية" للطالب.
-      5.CareerAdvice: نصيحة مهنية تربط بين مستواه الحالي وبين التطور في سوق العمل الهندسي.
-
-      الرد بصيغة JSON:
-      {
-        "completionRate": 0-100,
-        "bottleneckCourse": "اسم المادة",
-        "academicAnalysis": "نص تحليلي",
-        "battlePlan": [{ "code": "كود", "name": "اسم", "reason": "لماذا؟" }],
-        "careerAdvice": "نصيحة مهنية"
-      }
+      بناءً على بياناته الحقيقية:
+      - مواد نجح فيها: ${JSON.stringify(analyzedCatalog.filter(c => c.status === 'passed'))}
+      - مواد يدرسها الآن (Taken): ${JSON.stringify(analyzedCatalog.filter(c => c.status === 'taking'))}
+      - مواد "عنق زجاجة" مفتوحة له: ${JSON.stringify(analyzedCatalog.filter(c => c.status === 'open'))}
+      
+      المطلوب (رد JSON فقط):
+      1. احسب نسبة الإنجاز بناءً على الساعات المعتمدة للمواد الناجحة.
+      2. حلل أداء الطالب (مثلاً: "لديك تميز في الفيزياء و الميكانيكا لكن الرياضيات D تحتاج تركيز").
+      3. BattlePlan: اقترح 5 مواد للترم القادم تضمن فك أكبر قدر من المواد المغلقة (Locked).
     `;
 
-    // 5. استدعاء Gemini (استخدام النسخة المستقرة لعام 2026)
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
-    
-    // استخراج الـ JSON بدقة لتجنب أخطاء الـ Parsing
-    const start = responseText.indexOf('{');
-    const end = responseText.lastIndexOf('}') + 1;
-    return JSON.parse(responseText.substring(start, end));
+    return JSON.parse(result.response.text().replace(/```json|```/g, ""));
 
   } catch (error) {
-    console.error("AI Analysis Error:", error);
-    return {
-      completionRate: 0,
-      bottleneckCourse: "غير متوفر",
-      academicAnalysis: "حدث خطأ أثناء الاتصال بالمرشد الذكي، يرجى المحاولة لاحقاً.",
-      battlePlan: [],
-      careerAdvice: "تأكد من إكمال سجلاتك الدراسية ليتمكن النظام من تحليلها."
-    };
+    console.error("AI Sync Error:", error);
+    return null;
   }
 }
