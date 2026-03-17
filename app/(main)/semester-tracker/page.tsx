@@ -385,6 +385,6 @@ export default function SemesterTrackerPage() {
         </TabsContent>
       </Tabs>
     </div>
-    <TooltipProvider/>
+    </TooltipProvider>
   );
 }
