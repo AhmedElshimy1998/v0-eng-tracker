@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap } from "lucide-react"
+import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, settings } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
