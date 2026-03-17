@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { User, Phone, GraduationCap, Save, Loader2 } from "lucide-react";
-import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions"; 
+import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem, AlertTriangle } from "@/lib/academicActions"; 
 
 export default function SettingsPage() {
   const [name, setName] = useState("");
@@ -58,6 +58,18 @@ export default function SettingsPage() {
         </div>
       </div>
 
+
+      {/* رسالة الإجبار: بتظهر بس لو فيه بيانات ناقصة */}
+      {(!name || !department || !phone) && !isLoading && (
+        <div className="bg-yellow-500/10 border border-yellow-500/50 p-4 rounded-lg mb-6 flex items-start gap-3 text-yellow-600 dark:text-yellow-400">
+          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold">مرحباً بك في المنصة! خطوة أخيرة</h4>
+            <p className="text-sm">يجب إكمال بياناتك الأساسية بالأسفل (الاسم، الهاتف، والقسم) وحفظها لتتمكن من استخدام باقي خدمات الموقع واللوحة الجانبية.</p>
+          </div>
+        </div>
+      )}
+      
       <Card>
         <CardHeader>
           <CardTitle>البيانات الشخصية والأكاديمية</CardTitle>

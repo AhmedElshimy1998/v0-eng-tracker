@@ -3,6 +3,7 @@ import { usePathname } from "next/navigation"
 import { ClerkProvider } from '@clerk/nextjs'
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "sonner"
+import { ProfileGuard } from "@/components/profile-guard";
 
 export default function MainLayout({
   children,
@@ -22,7 +23,10 @@ export default function MainLayout({
                             {/* الـ Padding اليساري pl-64 يطبق فقط إذا لم تكن صفحة الهبوط */}
                                   <main className={!hideNavigation ? "pl-64" : ""}>
                                           <div className="container mx-auto max-w-7xl p-6 lg:p-8">
+                                                    {/* تغليف المحتوى بالحارس */}
+                                                    <ProfileGuard>
                                                     {children}
+                                                    </ProfileGuard>
                                                             </div>
                                                                   </main>
 
