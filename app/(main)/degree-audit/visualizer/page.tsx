@@ -10,10 +10,10 @@ import {
   Target, 
   TrendingUp, 
   Sparkles, 
-  ArrowLeftRight, 
   Briefcase,
   RefreshCw,
-  Zap
+  Zap,
+  AlertTriangle
 } from "lucide-react"
 import { getSmartAnalysis } from "@/lib/aiActions"
 import { cn } from "@/lib/utils"
@@ -36,24 +36,31 @@ export default function AIMentorPage() {
   if (loading) {
     return (
       <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
-        <div className="relative">
-          <BrainCircuit className="h-16 w-16 text-cyan-500 animate-pulse" />
-          <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-yellow-500 animate-bounce" />
-        </div>
-        <p className="text-muted-foreground font-medium">جاري تحليل بياناتك الأكاديمية والمهنية...</p>
+        <BrainCircuit className="h-16 w-16 text-cyan-500 animate-pulse" />
+        <p className="text-muted-foreground animate-bounce">جاري تحليل بياناتك الأكاديمية والمهنية...</p>
+      </div>
+    )
+  }
+
+  if (!data || data.completionRate === undefined) {
+    return (
+      <div className="flex h-[80vh] flex-col items-center justify-center gap-4 text-center p-6">
+        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+        <p>لم نتمكن من الحصول على تحليل دقيق. تأكد من إدخال درجاتك في سجل المواد أولاً.</p>
+        <Button onClick={loadAnalysis}>إعادة المحاولة</Button>
       </div>
     )
   }
 
   return (
     <div className="space-y-8 p-4 md:p-8 pb-12" dir="rtl">
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
             <Zap className="h-8 w-8 text-yellow-500 fill-yellow-500" /> المستشار الأكاديمي الذكي
           </h1>
-          <p className="text-muted-foreground mt-1">تحليل ذكاء اصطناعي مخصص لمسارك في هندسة الميكاترونيات.</p>
+          <p className="text-muted-foreground mt-1">تحليل مخصص بناءً على سجلاتك في قاعدة البيانات.</p>
         </div>
         <Button onClick={loadAnalysis} variant="outline" className="gap-2 border-cyan-500/50 hover:bg-cyan-500/10">
           <RefreshCw className="h-4 w-4" /> تحديث التحليل
@@ -62,91 +69,73 @@ export default function AIMentorPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* كارت الرؤية الجوهرية (AI Insight) */}
-        <Card className="md:col-span-2 border-cyan-500/20 bg-gradient-to-br from-cyan-500/5 via-transparent to-transparent">
+        {/* كارت نسبة الإنجاز - جديد */}
+        <Card className="md:col-span-3 border-none bg-gradient-to-l from-cyan-900/20 to-transparent">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-end mb-4">
+              <h3 className="text-xl font-bold">نسبة إنجازك في اللائحة</h3>
+              <span className="text-3xl font-black text-cyan-500">{data.completionRate}%</span>
+            </div>
+            <Progress value={data.completionRate} className="h-3 bg-white/5" />
+          </CardContent>
+        </Card>
+
+        {/* كارت التحليل الأكاديمي (الذي كان فارغاً) */}
+        <Card className="md:col-span-2 border-cyan-500/20 bg-cyan-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-cyan-500">
               <Sparkles className="h-5 w-5" /> ملخص الحالة الاستراتيجي
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg leading-relaxed font-medium text-slate-200">
-              {data.careerInsight}
+            <p className="text-lg leading-relaxed text-slate-200">
+              {/* تم تغيير المفتاح هنا إلى academicAnalysis ليطابق الـ Action */}
+              {data.academicAnalysis}
             </p>
+            {data.bottleneckCourse && (
+              <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                <span className="text-sm"><b>تنبيه عنق الزجاجة:</b> ركز على مادة <b>{data.bottleneckCourse}</b> لأنها تفتح مسارات هامة.</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* كارت الأداء المهني (Career Readiness) */}
+        {/* كارت الرؤية المهنية */}
         <Card className="border-white/5 bg-black/20">
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Target className="h-4 w-4 text-red-500" /> الجاهزية لسوق العمل
+              <Briefcase className="h-4 w-4 text-yellow-500" /> الرؤية المهنية
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>الأنظمة المدمجة (Embedded)</span>
-                <span className="text-cyan-500">90%</span>
-              </div>
-              <Progress value={90} className="h-1.5 bg-white/5" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>الأتمتة والـ PLC</span>
-                <span className="text-blue-500">85%</span>
-              </div>
-              <Progress value={85} className="h-1.5 bg-white/5" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>التحكم الآلي</span>
-                <span className="text-purple-500">70%</span>
-              </div>
-              <Progress value={70} className="h-1.5 bg-white/5" />
-            </div>
+          <CardContent>
+             <p className="text-xs text-slate-300 leading-relaxed italic">
+               {data.careerRoadmap}
+             </p>
           </CardContent>
         </Card>
 
-        {/* كارت خطة الترم القادم (Battle Plan) */}
+        {/* كارت خطة الهجوم (Battle Plan) */}
         <Card className="md:col-span-3 border-white/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-500" /> خطة الهجوم المقترحة (الترم القادم)
+              <TrendingUp className="h-5 w-5 text-green-500" /> المواد المقترحة للترم القادم
             </CardTitle>
-            <CardDescription>مواد تم اختيارها بعناية لتوازن بين التحصيل الدراسي وخبرتك العملية في AstraZeneca.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.battlePlan.map((item: any, index: number) => (
-              <div key={index} className="group p-5 rounded-2xl border border-white/5 bg-white/5 hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all duration-300">
-                <div className="flex justify-between items-start mb-3">
-                  <Badge className={cn(
-                    "bg-opacity-20 border-none",
-                    item.priority === 'High' ? "bg-red-500 text-red-400" : "bg-yellow-500 text-yellow-400"
-                  )}>
-                    {item.priority === 'High' ? 'أولوية قصوى' : 'موصى به'}
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground font-mono">{item.code}</span>
+            {data.battlePlan?.map((item: any, index: number) => (
+              <div key={index} className="p-4 rounded-xl border border-white/5 bg-white/5 group hover:border-cyan-500/30 transition-all">
+                <div className="flex justify-between items-center mb-2">
+                  <Badge variant="outline" className="text-cyan-500 border-cyan-500/30">{item.code}</Badge>
+                  <span className={cn(
+                    "text-[10px] px-2 py-0.5 rounded-full",
+                    item.priority === 'High' ? "bg-red-500/20 text-red-400" : "bg-blue-500/20 text-blue-400"
+                  )}>{item.priority}</span>
                 </div>
-                <h4 className="font-bold text-lg mb-2 group-hover:text-cyan-400 transition-colors">{item.course}</h4>
-                <p className="text-xs text-muted-foreground leading-relaxed">{item.advice}</p>
+                <h4 className="font-bold mb-1">{item.name}</h4>
+                <p className="text-[10px] text-muted-foreground">{item.reason}</p>
               </div>
             ))}
-          </CardContent>
-        </Card>
-
-        {/* كارت النصيحة المهنية (Industrial Insight) */}
-        <Card className="md:col-span-3 border-yellow-500/20 bg-yellow-500/5">
-          <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
-            <div className="h-16 w-16 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
-              <Briefcase className="h-8 w-8 text-yellow-500" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-bold text-lg text-yellow-500">نصيحة من واقع الصناعة</h3>
-              <p className="text-sm text-slate-300 leading-relaxed">
-                بما أنك تعمل في <b>AstraZeneca</b>، فإن تميزك في مادة "التحكم الآلي" سيجعلك قادراً على فهم منطق عمل خطوط الإنتاج الدوائية بشكل أعمق، مما قد يفتح لك فرصاً للانتقال من الجانب الفني إلى الجانب الهندسي التصميمي للأتمتة.
-              </p>
-            </div>
           </CardContent>
         </Card>
 
