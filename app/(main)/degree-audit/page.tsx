@@ -4,33 +4,50 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { GraduationCap, Map, BookOpen, Loader2 } from "lucide-react";
-import { getAcademicProfile } from "@/lib/academicActions";
+import { getAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
 
 export default function DegreeAudit() {
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState({ total: 0, percent: 0 });
+  const [departmentName, setDepartmentName] = useState("جاري التحميل...");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAcademicProfile().then(p => {
-      if (p) {
-        setProfile(p);
-        const semesters = p.semesters || [];
-        const allRecords = semesters.flatMap((s: any) => s.courses);
-        const effective = getEffectiveRecords(allRecords);
-        const { totalCredits } = calculateGPA(effective, coursesCatalog);
-        
-        // بافتراض أن ساعات التخرج الكلية 160 ساعة
-        const totalRequired = 160;
-        setStats({ 
-          total: totalCredits, 
-          percent: Math.min((totalCredits / totalRequired) * 100, 100) 
-        });
+    async function fetchData() {
+      try {
+        const [p, allDepts] = await Promise.all([
+          getAcademicProfile(),
+          getDepartments()
+        ]);
+
+        if (p) {
+          setProfile(p);
+          
+          // --- الجزء المسؤول عن عرض اسم القسم كما في لوحة الأدمن ---
+          const studentDeptId = p.department;
+          const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
+          setDepartmentName(deptObject ? deptObject.name : "لم يحدد بعد");
+
+          const semesters = p.semesters || [];
+          const allRecords = semesters.flatMap((s: any) => s.courses);
+          const effective = getEffectiveRecords(allRecords);
+          const { totalCredits } = calculateGPA(effective, coursesCatalog);
+          
+          const totalRequired = 160;
+          setStats({ 
+            total: totalCredits, 
+            percent: Math.min((totalCredits / totalRequired) * 100, 100) 
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    }
+    fetchData();
   }, []);
 
   const totalRequired = 160;
@@ -48,7 +65,6 @@ export default function DegreeAudit() {
         <h1 className="text-3xl font-bold">خريطة التخرج (Degree Audit)</h1>
       </div>
 
-      {/* شريط الإنجاز الكلي */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-6 space-y-4">
           <div className="flex justify-between items-end">
@@ -66,7 +82,6 @@ export default function DegreeAudit() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* الساعات المتبقية */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -79,7 +94,6 @@ export default function DegreeAudit() {
           </CardContent>
         </Card>
 
-        {/* التقدير الحالي */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -88,13 +102,13 @@ export default function DegreeAudit() {
           </CardHeader>
           <CardContent>
              <p className="text-sm text-muted-foreground mb-1">القسم الدراسي الحالي:</p>
-             <p className="font-bold text-lg">{profile?.department || "لم يحدد بعد"}</p>
+             <p className="font-bold text-xl text-primary">{departmentName}</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="bg-muted/20 border border-dashed rounded-xl p-8 text-center space-y-3">
-         <p className="text-muted-foreground text-sm font-medium">قريباً: سيتم إضافة قائمة المواد الإجبارية والاختيارية المتبقية بالاسم بناءً على لائحة قسمك الفعلية.</p>
+         <p className="text-muted-foreground text-sm font-medium">قريباً: سيتم إضافة قائمة المواد المتبقية بناءً على لائحة قسمك الفعلية.</p>
       </div>
     </div>
   );
