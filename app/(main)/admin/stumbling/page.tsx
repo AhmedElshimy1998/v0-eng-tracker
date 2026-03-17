@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChevronDown, ChevronUp, BookX, Search } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, BookX, Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 import { getAllStudents } from "@/lib/adminActions";

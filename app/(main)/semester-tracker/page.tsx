@@ -247,8 +247,10 @@ export default function SemesterTrackerPage() {
                         statusBadge = <Lock className="h-4 w-4 text-muted-foreground" />;
                       }
                     }
-                    // 1. فحص حالة القفل والسبب
+                    // 1. فحص حالة القفل والسبب بدقة
                     const check = checkCanTake([course.code], allStudentRecords, coursesCatalog);
+
+                    // المادة تعتبر مغلقة "فقط" إذا كان الطالب لم ينجح فيها، وليس له محاولة حالية، والمتطلبات غير مستوفاة
                     const isLocked = !check.canTake && !attempt;
 
                     // 2. تجهيز أسماء المتطلبات بالعربي
@@ -268,7 +270,7 @@ export default function SemesterTrackerPage() {
                       </div>
                     );
 
-                    // 4. المنطق: لو مغلقة حط Tooltip، لو مش مغلقة رجع الكارت عادي
+                    // 4. المنطق: لو مغلقة "فعلياً" حط Tooltip، غير كدة رجع الكارت عادي (ذهبي، أخضر، أحمر)
                     if (!isLocked) {
                       return <div key={`${course.code}-${attempt?.id || 'ideal'}`}>{CardContent}</div>;
                     }
@@ -284,11 +286,11 @@ export default function SemesterTrackerPage() {
                           className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[100] min-w-[250px] text-right"
                         >
                           <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-red-500 font-bold border-b border-white/10 pb-2">
+                            <div className="flex items-center gap-2 text-red-500 font-bold border-b border-white/10 pb-2 text-right">
                               <span>⛔ انتبه: المادة مغلقة</span>
                             </div>
                             
-                            <div className="space-y-1">
+                            <div className="space-y-1 text-right">
                               <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
                               <p className="text-sm font-semibold text-slate-100 leading-relaxed">
                                 {prereqDetails || "متطلب سابق غير محدد"}
@@ -297,7 +299,7 @@ export default function SemesterTrackerPage() {
                           </div>
                         </TooltipContent>
                       </Tooltip>
-                    );
+                    );  
                   })}
                 </div>
               </div>
