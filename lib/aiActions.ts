@@ -3,61 +3,77 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getStudentRecords } from "./academicActions";
 import { coursesCatalog } from "./courses";
+import { currentUser } from "@clerk/nextjs/server";
+import { kv } from "@upstash/kv";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function getSmartAnalysis() {
   try {
-    const records = await getStudentRecords();
-    
-    // 1. تحضير سياق البيانات لـ Gemini
+    // 1. جلب بيانات المستخدم الحالية من Clerk (دايناميك)
+    const user = await currentUser();
+    if (!user) throw new Error("User not found");
+
+    const studentName = user.firstName || "طالب هندسة";
+    const userId = user.id;
+
+    // 2. جلب سجلات المواد من Upstash KV
+    const records: any[] = await getStudentRecords();
+
+    // 3. جلب بيانات "البروفايل المهني" لو الطالب مسجلها (اختياري)
+    const userProfile: any = await kv.get(`user_profile:${userId}`) || {};
+
+    // 4. تحضير سياق البيانات التقني
     const studentData = {
-      name: "أحمد عادل الشيمي",
-      university: "Tanta University - Mechatronics Engineering",
-      job: "Engineering Technician at AstraZeneca",
-      interests: ["PLC", "Embedded Systems", "Automation"],
-      passedCourses: records.map(r => {
-        const course = coursesCatalog.find(c => c.code === r.courseCode);
-        return { name: course?.arabicName, grade: r.grade, code: r.courseCode };
-      }),
-      remainingCourses: coursesCatalog
-        .filter(c => !records.some(r => r.courseCode === c.code))
-        .map(c => ({ name: c.arabicName, code: c.code, prereqs: c.prerequisites }))
+      fullName: studentName,
+      records: records, // المواد اللي خلصها ودرجاته
+      jobTitle: userProfile.jobTitle || "طالب منتظم", 
+      interests: userProfile.interests || ["الهندسة العامة"],
+      totalCatalogCount: coursesCatalog.length,
+      passedCount: records.length
     };
 
-    // 2. تصميم الـ Prompt الاحترافي
+    // 5. الـ Prompt العام (Generic Prompt)
+    // لاحظ إننا هنا مش بنذكر اسمك ولا شركتك، الـ AI بياخدهم من المتغيرات
     const prompt = `
-      أنت مستشار أكاديمي خبير لطلاب الهندسة. حلل بيانات الطالب التالي:
-      ${JSON.stringify(studentData)}
+      بصفتك مستشاراً أكاديمياً ذكياً لمنصة هندسية، قم بتحليل بروفايل الطالب التالي:
+      بيانات الطالب: ${JSON.stringify(studentData)}
+      قائمة المواد المتاحة: ${JSON.stringify(coursesCatalog)}
 
-      المطلوب منك هو إرجاع رد بصيغة JSON فقط كالتالي:
+      المطلوب تحليل دقيق وحيادي يشمل:
+      1. حساب نسبة الإنجاز الكلية بناءً على الساعات المعتمدة.
+      2. تحديد "المسار الحرج": ما هي المواد المتبقية التي تفتح أكبر قدر من المتطلبات اللاحقة؟
+      3. تحليل نقاط القوة: بناءً على درجاته في المواد التي اجتازها، ما هي مهاراته التقنية؟
+      4. نصيحة التسجيل: اقترح قائمة مواد للترم القادم تضمن أسرع طريق للتخرج مع موازنة صعوبة المواد.
+
+      يجب أن يكون الرد بصيغة JSON حصراً بهذا التنسيق:
       {
-        "careerInsight": "نصيحة مهنية قصيرة تربط دراسته بعمله في AstraZeneca"،
-        "skillsRadar": { "math": 0-100, "programming": 0-100, "mechanics": 0-100, "electronics": 0-100 },
+        "completionRate": 0-100,
+        "academicAnalysis": "تحليل تقني لنقاط القوة والضعف",
         "battlePlan": [
-          { "course": "اسم المادة", "code": "الكود", "priority": "High/Medium", "advice": "لماذا هذه المادة؟" }
-        ]
+          { "course": "اسم المادة", "code": "الكود", "priority": "High/Medium", "reason": "السبب الأكاديمي" }
+        ],
+        "careerAdvice": "نصيحة تربط مستواه الأكاديمي بأهدافه المهنية المذكورة في البروفايل"
       }
-      اجعل النصيحة باللغة العربية، بأسلوب مهني ومشجع.
+      اللغة: العربية. الأسلوب: مهني، عملي، ومختصر.
     `;
 
-    // 3. استدعاء Gemini
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
-    // تنظيف الرد من أي علامات Markdown إذا وجدت
-    const cleanJson = responseText.replace(/```json|```/g, "").trim();
-    
-    return JSON.parse(cleanJson);
+    // استخراج الـ JSON بدقة
+    const start = responseText.indexOf('{');
+    const end = responseText.lastIndexOf('}') + 1;
+    return JSON.parse(responseText.substring(start, end));
 
   } catch (error) {
     console.error("AI Analysis Error:", error);
-    // رد افتراضي في حالة الخطأ لضمان عدم توقف الصفحة
     return {
-      careerInsight: "خطأ في الاتصال بالمستشار الذكي، حاول مرة أخرى.",
-      skillsRadar: { math: 50, programming: 50, mechanics: 50, electronics: 50 },
-      battlePlan: []
+      completionRate: 0,
+      academicAnalysis: "لا يمكن إتمام التحليل حالياً، تأكد من إدخال درجاتك أولاً.",
+      battlePlan: [],
+      careerAdvice: "استكمل بيانات بروفايلك للحصول على نصيحة مهنية مخصصة."
     };
   }
 }
