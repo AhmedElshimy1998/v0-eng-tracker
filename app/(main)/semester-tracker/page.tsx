@@ -136,7 +136,15 @@ const completedCredits = useMemo(() => {
       </div>
     );
   }
+const getStudentLevel = (credits: number) => {
+  if (credits < 32) return { label: "Level 0", color: "bg-blue-500/10 text-blue-500" };
+  if (credits < 64) return { label: "Level 1", color: "bg-cyan-500/10 text-cyan-500" };
+  if (credits < 96) return { label: "Level 2", color: "bg-green-500/10 text-green-500" };
+  if (credits < 128) return { label: "Level 3", color: "bg-yellow-500/10 text-yellow-500" };
+  return { label: "Level 4", color: "bg-purple-500/10 text-purple-500" };
+};
 
+const level = getStudentLevel(completedCredits);
   return (
     <TooltipProvider>
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -161,15 +169,20 @@ const completedCredits = useMemo(() => {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">الساعات المنجزة</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{completedCredits}</div>
-            <p className="text-xs text-muted-foreground">ساعة معتمدة بنجاح</p>
-          </CardContent>
-        </Card>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">الساعات المنجزة</CardTitle>
+    <CheckCircle2 className="h-4 w-4 text-green-500" />
+  </CardHeader>
+  <CardContent>
+    <div className="flex justify-between items-center">
+      <div className="text-2xl font-bold">{completedCredits}</div>
+      <Badge variant="outline" className="text-[10px] opacity-70 border-muted">
+        {level.label} Status
+      </Badge>
+    </div>
+    <p className="text-xs text-muted-foreground">ساعة معتمدة بنجاح من أصل 160</p>
+  </CardContent>
+</Card>
         <Card className="relative group cursor-pointer hover:border-red-500/50 transition-colors">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">ساعات الرسوب</CardTitle>
