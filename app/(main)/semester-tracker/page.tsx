@@ -72,13 +72,37 @@ export default function SemesterTrackerPage() {
     calculateGPA(effectiveRecords, coursesCatalog), [effectiveRecords]);
 
   const warnings = useMemo(() => {
-    let count = 0;
-    semesters.forEach(sem => {
-      const stats = calculateGPA(sem.courses, coursesCatalog);
-      if (stats.totalCredits > 0 && stats.gpa < 2.0) count++;
+    let consecutiveWarnings = 0;
+
+    const sortedSemesters = [...semesters].sort((a, b) => {
+      return officialSemesters.indexOf(a.name) - officialSemesters.indexOf(b.name);
     });
-    return count;
-  }, [semesters]);
+
+    sortedSemesters.forEach(sem => {
+      const stats = calculateGPA(sem.courses, coursesCatalog);
+      if (stats.totalCredits > 0) {
+        if (stats.gpa < 2.0) {
+          consecutiveWarnings++;
+        } else {
+          consecutiveWarnings = 0;
+        }
+      }
+    });
+
+    const hasCumulativeWarning = cgpa < 2.0 && completedCredits > 0;
+    let totalCount = consecutiveWarnings + (hasCumulativeWarning ? 1 : 0);
+    
+    let text = 'وضع أكاديمي مستقر';
+    if (hasCumulativeWarning && consecutiveWarnings > 0) {
+       text = `إنذار تراكمي + ${consecutiveWarnings} إنذار فصلي`;
+    } else if (hasCumulativeWarning) {
+       text = 'إنذار تراكمي (CGPA < 2.0)';
+    } else if (consecutiveWarnings > 0) {
+       text = `${consecutiveWarnings} إنذار فصلي متتالي`;
+    }
+
+    return { count: totalCount, text, isDanger: totalCount > 0 };
+  }, [semesters, cgpa, completedCredits, officialSemesters]);
 
   const handleAddSemester = (name: string) => {
     if (semesters.find(s => s.name === name)) return alert("هذا الفصل مضاف بالفعل");
@@ -167,11 +191,13 @@ export default function SemesterTrackerPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">حالة الإنذارات</CardTitle>
-            <AlertTriangle className={`h-4 w-4 ${warnings > 0 ? 'text-red-500' : 'text-green-500'}`} />
+            <AlertTriangle className={`h-4 w-4 ${warnings.isDanger ? 'text-red-500' : 'text-green-500'}`} />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${warnings > 0 ? 'text-red-500' : 'text-green-500'}`}>{warnings}</div>
-            <p className="text-xs text-muted-foreground">{warnings === 0 ? 'وضع أكاديمي مستقر' : 'تحذير أكاديمي!'}</p>
+            <div className={`text-2xl font-bold ${warnings.isDanger ? 'text-red-500' : 'text-green-500'}`}>
+              {warnings.count}
+            </div>
+            <p className="text-[11px] font-bold text-muted-foreground mt-1">{warnings.text}</p>
           </CardContent>
         </Card>
       </div>
