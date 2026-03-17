@@ -363,17 +363,40 @@ const completedCredits = useMemo(() => {
 
           <div className="grid gap-6 lg:grid-cols-2">
             {semesters.map((sem, semIndex) => {
-              const semStats = calculateGPA(sem.courses, coursesCatalog);
-              return (
-                <Card key={sem.name}>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/10 pb-4">
-                    <div>
-                      <CardTitle className="text-md">{sem.name}</CardTitle>
-                      <CardDescription className="mt-1">
-                        المعدل الفصلي: <span className={`font-bold ${semStats.gpa >= 2 ? 'text-green-500' : 'text-red-500'}`}>{semStats.gpa.toFixed(2)}</span> 
-                        <span className="mx-2">|</span> الساعات: {semStats.totalCredits}
-                      </CardDescription>
-                    </div>
+  const semStats = calculateGPA(sem.courses, coursesCatalog);
+  
+  // 1. حساب ساعات النجاح الفعلية لهذا الترم فقط
+  const passedCreditsInSem = sem.courses
+    .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade)) // فلتر النجاح
+    .reduce((sum, r) => {
+      const course = coursesCatalog.find(c => c.code === r.courseCode);
+      return sum + (course?.credits || 0);
+    }, 0);
+
+  return (
+    <Card key={sem.name}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b bg-muted/10 pb-4">
+        <div>
+          <CardTitle className="text-md">{sem.name}</CardTitle>
+          <CardDescription className="mt-1 flex flex-wrap gap-2 items-center">
+            {/* المعدل الفصلي */}
+            <span className="flex items-center gap-1">
+              المعدل: <span className={`font-bold ${semStats.gpa >= 2 ? 'text-green-500' : 'text-red-500'}`}>{semStats.gpa.toFixed(2)}</span>
+            </span>
+            <span className="text-muted-foreground">|</span>
+            
+            {/* ساعات التسجيل (الإجمالي) */}
+            <span className="flex items-center gap-1">
+              التسجيل: <span className="font-bold text-blue-400">{semStats.totalCredits}</span>
+            </span>
+            <span className="text-muted-foreground">|</span>
+            
+            {/* ساعات النجاح (الفعلية) */}
+            <span className="flex items-center gap-1">
+              النجاح: <span className="font-bold text-green-500">{passedCreditsInSem}</span>
+            </span>
+          </CardDescription>
+        </div>
                     <Button variant="ghost" size="icon" onClick={() => {
                       if(confirm("متأكد من حذف هذا الفصل بالكامل؟")) {
                         const up = [...semesters]; up.splice(semIndex,1); saveSemestersToCloud(up);
