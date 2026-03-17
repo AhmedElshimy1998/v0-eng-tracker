@@ -248,58 +248,63 @@ export default function SemesterTrackerPage() {
                       }
                     }
                     // 1. فحص حالة القفل والسبب بدقة
-                    const check = checkCanTake([course.code], allStudentRecords, coursesCatalog);
+                    // 1. الشرط الصارم: الكارت مغلق "فقط" لو ملوش أي محاولة سابقة، وهو في الخطة المثالية، والمتطلبات غير مستوفاة
+                        const isLockedCard = !attempt && isIdeal && !canTake;
 
-                    // المادة تعتبر مغلقة "فقط" إذا كان الطالب لم ينجح فيها، وليس له محاولة حالية، والمتطلبات غير مستوفاة
-                    const isLocked = !check.canTake && !attempt;
+                        // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في النافذة
+                        const prereqDetails = course.prerequisites && course.prerequisites.length > 0 
+                          ? course.prerequisites.map(pCode => {
+                              const pInfo = coursesCatalog.find(c => c.code === pCode);
+                              return `${pInfo?.arabicName || pCode} (${pCode})`;
+                            }).join(" - ")
+                          : "لا يوجد متطلبات محددة";
 
-                    // 2. تجهيز أسماء المتطلبات بالعربي
-                    const prereqDetails = course.prerequisites.map(pCode => {
-                      const pInfo = coursesCatalog.find(c => c.code === pCode);
-                      return `${pInfo?.arabicName || pCode} (${pCode})`;
-                    }).join(" - ");
-
-                    // 3. محتوى الكارت (الـ UI الثابت)
-                    const CardContent = (
-                      <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle} ${isLocked ? 'cursor-help' : 'cursor-default'}`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="font-semibold text-sm text-right">{course.arabicName}</div>
-                          {statusBadge}
-                        </div>
-                        <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
-                      </div>
-                    );
-
-                    // 4. المنطق: لو مغلقة "فعلياً" حط Tooltip، غير كدة رجع الكارت عادي (ذهبي، أخضر، أحمر)
-                    if (!isLocked) {
-                      return <div key={`${course.code}-${attempt?.id || 'ideal'}`}>{CardContent}</div>;
-                    }
-
-                    return (
-                      <Tooltip key={`${course.code}-${attempt?.id || 'ideal'}`} delayDuration={200}>
-                        <TooltipTrigger asChild>
-                          {CardContent}
-                        </TooltipTrigger>
-                        
-                        <TooltipContent 
-                          side="top" 
-                          className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[100] min-w-[250px] text-right"
-                        >
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-red-500 font-bold border-b border-white/10 pb-2 text-right">
-                              <span>⛔ انتبه: المادة مغلقة</span>
+                        // 3. تصميم الكارت نفسه (ثابت لكل الحالات عشان شكل الصفحة ما يتغيرش)
+                        const cardElement = (
+                          <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all h-full ${cardStyle} ${isLockedCard ? 'cursor-help' : ''}`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="font-semibold text-sm text-right">{course.arabicName}</div>
+                              {statusBadge}
                             </div>
-                            
-                            <div className="space-y-1 text-right">
-                              <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
-                              <p className="text-sm font-semibold text-slate-100 leading-relaxed">
-                                {prereqDetails || "متطلب سابق غير محدد"}
-                              </p>
-                            </div>
+                            <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
                           </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    );  
+                        );
+
+                        // 4. الحل النهائي: لو الكارت رمادي (مغلق)، حط النافذة.. لو أي حاجة تانية، رجع الكارت "حاف"
+                        if (isLockedCard) {
+                          return (
+                            <TooltipProvider key={`${course.code}-locked`}>
+                              <Tooltip delayDuration={200}>
+                                <TooltipTrigger asChild>
+                                  {cardElement}
+                                </TooltipTrigger>
+                                <TooltipContent 
+                                  side="top" 
+                                  className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[500] min-w-[250px] text-right"
+                                >
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-end gap-2 text-red-500 font-bold border-b border-white/10 pb-2">
+                                      <span>⛔ انتبه: المادة مغلقة</span>
+                                    </div>
+                                    <div className="space-y-1 text-right">
+                                      <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
+                                      <p className="text-sm font-semibold text-slate-100 leading-relaxed">
+                                        {prereqDetails}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        }
+
+                        // للمواد الذهبية (متاحة)، الخضراء (ناجحة)، والحمراء (رسوب)
+                        return (
+                          <div key={`${course.code}-${attempt?.id || 'ideal'}`} className="h-full">
+                            {cardElement}
+                          </div>
+                        ); 
                   })}
                 </div>
               </div>
