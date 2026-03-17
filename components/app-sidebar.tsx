@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, Settings, Shield, Map, Calculator, Menu, X } from "lucide-react"
+import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, Settings, Shield, Map, Calculator, Menu, X , BrainCircuit} from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -14,6 +14,7 @@ const navigation = [
   { name: "Subjects", href: "/subjects", icon: BookOpen },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap },
+  { name: "المستشار الذكي", href: "/degree-audit/ai-mentor", icon: BrainCircuit },
   { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map }, 
   { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator }, 
   { name: "Settings", href: "/settings", icon: Settings },
