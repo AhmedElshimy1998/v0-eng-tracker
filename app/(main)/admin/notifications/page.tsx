@@ -13,17 +13,37 @@ export default function AdminNotificationsPage() {
   const [audience, setAudience] = useState("all");
   const [isSending, setIsSending] = useState(false);
 
-  const handleSend = async () => {
+  const handleSend = async () => {const handleSend = async () => {
     if (!title || !message) return alert("يرجى كتابة العنوان والرسالة.");
     setIsSending(true);
     
-    // هنا بيتم استدعاء الـ API اللي بيبعت الإشعارات (جاهز للربط مع web-push بتاعك)
-    // محاكاة إرسال لمدة ثانية
-    await new Promise(r => setTimeout(r, 1000));
-    
-    alert(`تم إرسال الإشعار بنجاح للفئة المستهدفة!`);
-    setTitle(""); setMessage("");
-    setIsSending(false);
+    try {
+      const response = await fetch('/api/admin/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, message, audience })
+      });
+      
+      const data = await response.json();
+      
+      // طباعة تقرير السيرفر في كونسول المتصفح
+      console.log("=== تقرير سيرفر الإشعارات ===");
+      if (data.logs && Array.isArray(data.logs)) {
+        data.logs.forEach((log: string) => console.log(log));
+      }
+      console.log("============================");
+
+      if (data.success) {
+        alert(`اكتملت العملية!\nانظر إلى Console المتصفح (F12) لترى التقرير المفصل.\nالإشعارات الناجحة: ${data.sentCount}`);
+        setTitle(""); setMessage("");
+      } else {
+        alert("حدث خطأ أثناء الإرسال. راجع كونسول المتصفح.");
+      }
+    } catch (error) {
+      alert("تعذر الاتصال بالخادم.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (

@@ -7,7 +7,6 @@ import { checkIsAdmin, getAllStudents } from "@/lib/adminActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
 
-// إعداد مفاتيح التشفير للتواصل مع المتصفح
 webpush.setVapidDetails(
   "mailto:admin@studyhub.com",
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string,
@@ -15,24 +14,25 @@ webpush.setVapidDetails(
 );
 
 export async function POST(req: Request) {
+  const debugLogs: string[] = [];
   try {
-    console.log("=== بداية إرسال إشعارات الإدارة ===");
+    debugLogs.push("1. بدء تشغيل API الإشعارات.");
     
-    // 1. التحقق من الصلاحيات
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) {
-      console.log("رفض: المستخدم ليس مديراً");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      debugLogs.push("❌ رفض: المستخدم ليس مديراً.");
+      return NextResponse.json({ error: "Unauthorized", logs: debugLogs }, { status: 403 });
     }
+    debugLogs.push("2. تم التحقق من صلاحيات المدير بنجاح.");
 
-    // 2. استلام البيانات
     const { title, message, audience } = await req.json();
-    console.log(`البيانات المستلمة - العنوان: ${title}, الفئة: ${audience}`);
+    debugLogs.push(`3. استلام البيانات: الفئة [${audience}].`);
 
     const students = await getAllStudents();
+    debugLogs.push(`4. تم جلب ${students.length} طالب من قاعدة البيانات.`);
+
     let targetUserIds: string[] = [];
 
-    // 3. فلترة الطلاب (نفس الفكرة بتاعتك بس على مستوى الأدمن)
     if (audience === "all") {
       targetUserIds = students.map(s => s.userId);
     } else {
@@ -48,46 +48,38 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log(`تم العثور على عدد (${targetUserIds.length}) مستخدم مطابق للفئة (${audience})`);
+    debugLogs.push(`5. عدد الطلاب المطابقين للفئة: ${targetUserIds.length}`);
 
     let notificationsSent = 0;
-    
-    // شكل الـ payload اللي بيستقبله ملف sw.js بتاعك بالظبط
     const payload = JSON.stringify({
       title: title || "تنبيه من الإدارة",
       body: message,
       url: "/"
     });
 
-    // 4. الدوران على كل مستخدم وإرسال الإشعار
     for (const userId of targetUserIds) {
-      console.log(`جاري فحص اشتراكات المستخدم: ${userId}`);
-      
-      // جلب "اشتراكات الإشعارات" الخاصة بهذا المستخدم فقط
       const subscriptions: any[] = (await kv.get(`push-subscriptions-${userId}`)) || [];
-      
       if (subscriptions.length > 0) {
-        console.log(`تم العثور على ${subscriptions.length} اشتراك للمستخدم ${userId}`);
-        
+        debugLogs.push(`- المستخدم ${userId}: تم العثور على ${subscriptions.length} جهاز/اشتراك.`);
         for (const sub of subscriptions) {
           try {
             await webpush.sendNotification(sub, payload);
-            console.log(`✅ نجاح: تم إرسال الإشعار لجهاز المستخدم ${userId}`);
             notificationsSent++;
-          } catch (err) {
-            console.error(`❌ فشل: خطأ أثناء الإرسال للمستخدم ${userId}:`, err);
+            debugLogs.push(`  ✔️ نجاح إرسال لجهاز تبع ${userId}`);
+          } catch (err: any) {
+            debugLogs.push(`  ❌ فشل إرسال لجهاز تبع ${userId} السبب: ${err.message}`);
           }
         }
       } else {
-        console.log(`لم يتم العثور على اشتراكات (أجهزة مفعلة) للمستخدم ${userId}`);
+        debugLogs.push(`- المستخدم ${userId}: ليس لديه أي اشتراك إشعارات.`);
       }
     }
 
-    console.log(`=== انتهاء: تم إرسال ${notificationsSent} إشعار بنجاح ===`);
-    return NextResponse.json({ success: true, sentCount: notificationsSent, targetedUsers: targetUserIds.length });
+    debugLogs.push(`6. انتهت العملية. إجمالي الأجهزة المستلمة: ${notificationsSent}`);
+    return NextResponse.json({ success: true, sentCount: notificationsSent, targetedUsers: targetUserIds.length, logs: debugLogs });
 
   } catch (error: any) {
-    console.error("خطأ عام في API الإشعارات:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    debugLogs.push(`❌ خطأ عام: ${error.message}`);
+    return NextResponse.json({ success: false, error: error.message, logs: debugLogs }, { status: 500 });
   }
 }
