@@ -94,7 +94,6 @@ export default function SemesterTrackerPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* الكروت كما هي */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">المعدل التراكمي (CGPA)</CardTitle>
@@ -114,6 +113,7 @@ export default function SemesterTrackerPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{completedCredits}</div>
+            <p className="text-xs text-muted-foreground">ساعة معتمدة بنجاح</p>
           </CardContent>
         </Card>
         <Card className="relative group cursor-pointer hover:border-red-500/50 transition-colors">
@@ -123,6 +123,7 @@ export default function SemesterTrackerPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{failedCredits}</div>
+            <p className="text-xs text-muted-foreground">مرر الماوس لمعرفة المواد</p>
           </CardContent>
           <div className="absolute top-full mt-2 left-0 w-full z-50 hidden group-hover:block">
             <div className="bg-popover border shadow-lg rounded-md p-3 text-sm flex flex-col gap-2">
@@ -132,6 +133,7 @@ export default function SemesterTrackerPage() {
                   return (
                     <div key={r.id} className="flex justify-between items-center text-red-500 border-b pb-1 last:border-0">
                       <span>{cInfo?.arabicName || r.courseCode}</span>
+                      <span>{cInfo?.credits} ساعة</span>
                     </div>
                   )
                 })
@@ -148,6 +150,7 @@ export default function SemesterTrackerPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${warnings > 0 ? 'text-red-500' : 'text-green-500'}`}>{warnings}</div>
+            <p className="text-xs text-muted-foreground">{warnings === 0 ? 'وضع أكاديمي مستقر' : 'تحذير أكاديمي!'}</p>
           </CardContent>
         </Card>
       </div>
@@ -171,7 +174,6 @@ export default function SemesterTrackerPage() {
 
             if (coursesInThisSem.length === 0) return null;
 
-            // حساب المعدل الفصلي الفعلي للترم ده لو الطالب مسجله
             const actualSemRecord = semesters.find(s => s.name === semName);
             let semGPAStats = null;
             if (actualSemRecord) {
@@ -184,7 +186,6 @@ export default function SemesterTrackerPage() {
                   <h3 className="text-lg font-bold flex items-center gap-2 border-r-4 border-primary pr-3">
                     {semName}
                   </h3>
-                  {/* هنا تم إضافة شارة المعدل الفصلي */}
                   {semGPAStats && semGPAStats.totalCredits > 0 && (
                     <Badge variant="outline" className={`px-3 py-1 text-sm font-semibold ${semGPAStats.gpa >= 2 ? 'text-green-600 border-green-500/30 bg-green-500/10 dark:text-green-400' : 'text-red-600 border-red-500/30 bg-red-500/10 dark:text-red-400'}`}>
                       المعدل الفصلي: {semGPAStats.gpa.toFixed(2)}
@@ -246,7 +247,6 @@ export default function SemesterTrackerPage() {
         <TabsContent value="semesters-management" className="space-y-6">
           <div className="flex justify-between items-center bg-muted/20 p-4 rounded-lg border border-dashed">
             <p className="text-sm text-muted-foreground">اختر الفصل الدراسي لإضافته:</p>
-            {/* حل مشكلة الألوان في Select */}
             <select 
               className="h-10 rounded-md border border-input bg-background text-foreground dark:bg-[#09090b] dark:text-slate-50 px-3 text-sm focus:ring-1 focus:ring-primary outline-none"
               onChange={(e) => { handleAddSemester(e.target.value); e.target.value = ""; }}
@@ -271,7 +271,7 @@ export default function SemesterTrackerPage() {
                       </CardDescription>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => {
-                      if(confirm("متأكد من حذف هذا الفصل؟")) {
+                      if(confirm("متأكد من حذف هذا الفصل بالكامل؟")) {
                         const up = [...semesters]; up.splice(semIndex,1); saveSemestersToCloud(up);
                       }
                     }}>
@@ -279,13 +279,19 @@ export default function SemesterTrackerPage() {
                     </Button>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3">
-                     {/* حل مشكلة الألوان في Select الإضافة */}
                      <select 
                       className="w-full h-9 rounded-md border border-input bg-background text-foreground dark:bg-[#09090b] dark:text-slate-50 px-3 text-sm mb-4 outline-none"
                       onChange={(e) => {
                         const code = e.target.value;
                         const updated = [...semesters];
-                        updated[semIndex].courses.push({ id: Math.random().toString(), courseCode: code, semester: sem.name, grade: "Taken", points: 0, isRetake: allStudentRecords.some(r => r.courseCode === code) });
+                        updated[semIndex].courses.push({ 
+                          id: Math.random().toString(), 
+                          courseCode: code, 
+                          semester: sem.name, 
+                          grade: "Taken", 
+                          points: 0, 
+                          isRetake: allStudentRecords.some(r => r.courseCode === code) 
+                        });
                         saveSemestersToCloud(updated); e.target.value = "";
                       }}
                       defaultValue=""
@@ -306,8 +312,9 @@ export default function SemesterTrackerPage() {
                          <div key={record.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/50 transition-colors">
                            <div className="flex-1 truncate">
                              <div className="text-sm font-medium truncate">{c?.arabicName || record.courseCode}</div>
+                             {/* تم إرجاع كود المادة هنا */}
+                             <div className="text-xs text-muted-foreground">{c?.code}</div>
                            </div>
-                           {/* حل مشكلة الألوان في Select الدرجة */}
                            <select 
                             className="h-8 border rounded px-1 text-xs outline-none focus:ring-1 focus:ring-primary ml-2 bg-background text-foreground dark:bg-[#09090b] dark:text-slate-50"
                             value={record.grade}
@@ -321,10 +328,24 @@ export default function SemesterTrackerPage() {
                          </div>
                        )
                      })}
+
+                     {/* تم إرجاع رسالة الترم الفارغ هنا */}
+                     {sem.courses.length === 0 && (
+                       <div className="text-center text-xs text-muted-foreground pt-2">
+                         لم تقم بتسجيل مواد في هذا الترم بعد.
+                       </div>
+                     )}
                   </CardContent>
                 </Card>
               )
             })}
+            
+            {/* تم إرجاع رسالة عدم وجود فصول نهائياً هنا */}
+            {semesters.length === 0 && (
+              <div className="col-span-full text-center py-12 text-muted-foreground border rounded-lg border-dashed">
+                لم تقم بإضافة أي فصول دراسية بعد. ابدأ بإضافة فصل دراسي للتخطيط.
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
