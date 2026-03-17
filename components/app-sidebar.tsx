@@ -14,7 +14,7 @@ const navigation = [
   { name: "Subjects", href: "/subjects", icon: BookOpen },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap },
-  { name: "المستشار الذكي", href: "/degree-audit/ai-mentor", icon: BrainCircuit },
+  { name: "AI Smart Advisor", href: "/ai-mentor", icon: BrainCircuit },
   { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map }, 
   { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator }, 
   { name: "Settings", href: "/settings", icon: Settings },
