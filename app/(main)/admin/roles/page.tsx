@@ -1,30 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, ShieldCheck, Trash2, UserX } from "lucide-react";
+import { Loader2, ShieldCheck, UserX, Search, Filter } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
+import { Input } from "@/components/ui/input";
 
-// استيراد الدوال من ملف الأكشنز
 import { getAllStudents, toggleAdminStatus, getSiteAdmins, deleteUserAccount } from "@/lib/adminActions";
+import { getDepartments, DepartmentItem } from "@/lib/academicActions";
+import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+import { coursesCatalog } from "@/lib/courses";
 
 export default function RolesManagementPage() {
-  const { userId: currentUserId } = useAuth(); // عشان نعرف مين اللي فاتح الصفحة
+  const { userId: currentUserId } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [adminsList, setAdminsList] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState("all");
+
   const loadData = async () => {
     setIsLoading(true);
-    const [studentsData, adminsData] = await Promise.all([
+    const [studentsData, adminsData, deptsData] = await Promise.all([
       getAllStudents(),
-      getSiteAdmins()
+      getSiteAdmins(),
+      getDepartments()
     ]);
     setUsers(studentsData);
     setAdminsList(adminsData);
+    setDepartments(deptsData);
     setIsLoading(false);
   };
 
@@ -32,47 +41,56 @@ export default function RolesManagementPage() {
     loadData();
   }, []);
 
-  // دالة الترقية / سحب الصلاحية
-  const handleToggleRole = async (targetId: string, currentIsAdmin: boolean) => {
-    if (targetId === currentUserId) {
-      return alert("لا يمكنك تغيير صلاحيات نفسك من هذه الشاشة!");
-    }
-    
-    const confirmMsg = currentIsAdmin 
-      ? "هل أنت متأكد من سحب صلاحيات الإدارة من هذا المستخدم؟" 
-      : "هل أنت متأكد من ترقية هذا المستخدم ليكون مدير (Admin)؟";
+  const getLevel = (credits: number) => {
+    const levelNum = Math.floor(credits / 32);
+    const levels = ["المستوى الصفري", "المستوى الأول", "المستوى الثاني", "المستوى الثالث", "المستوى الرابع"];
+    return levels[Math.min(levelNum, 4)];
+  };
+
+  const filteredUsers = useMemo(() => {
+    return users.map(user => {
+      const semesters = user.profile.semesters || [];
+      const allRecords = semesters.flatMap((s: any) => s.courses);
+      const effectiveRecords = getEffectiveRecords(allRecords);
+      const { totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
       
+      const levelName = getLevel(totalCredits);
+      // توحيد اسم القسم
+      const deptName = departments.find(d => d.id === user.profile.department)?.name || (user.profile.department === "General" ? "المواد العامة" : user.profile.department);
+      
+      return { ...user, computed: { levelName, deptName } };
+    }).filter(user => {
+      const searchMatch = 
+        (user.profile.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.profile.phone || "").includes(searchTerm);
+      const levelMatch = selectedLevel === "all" || user.computed.levelName === selectedLevel;
+      return searchMatch && levelMatch;
+    });
+  }, [users, searchTerm, selectedLevel, departments]);
+
+  const handleToggleRole = async (targetId: string, currentIsAdmin: boolean) => {
+    if (targetId === currentUserId) return alert("لا يمكنك تغيير صلاحيات نفسك من هذه الشاشة!");
+    const confirmMsg = currentIsAdmin ? "هل أنت متأكد من سحب صلاحيات الإدارة من هذا المستخدم؟" : "هل أنت متأكد من ترقية هذا المستخدم ليكون مدير (Admin)؟";
     if (!confirm(confirmMsg)) return;
 
     setProcessingId(targetId);
     const result = await toggleAdminStatus(targetId, !currentIsAdmin);
-    if (result.success) {
-      await loadData(); // تحديث القائمة
-    } else {
-      alert("حدث خطأ أثناء تعديل الصلاحيات.");
-    }
+    if (result.success) await loadData();
+    else alert("حدث خطأ أثناء تعديل الصلاحيات.");
     setProcessingId(null);
   };
 
-  // دالة الحذف النهائي (النووي)
   const handleDeleteUser = async (targetId: string, userName: string) => {
-    if (targetId === currentUserId) {
-      return alert("لا يمكنك حذف حسابك الشخصي من هنا!");
-    }
-
+    if (targetId === currentUserId) return alert("لا يمكنك حذف حسابك الشخصي من هنا!");
     const confirmMsg = `⚠️ تحذير خطير ⚠️\nهل أنت متأكد من حذف الطالب "${userName}" نهائياً؟\nسيتم مسح حسابه وكل بياناته من قاعدة البيانات ولن يمكن التراجع عن هذا الإجراء!`;
-    
     if (!confirm(confirmMsg)) return;
 
     setProcessingId(targetId);
     const result = await deleteUserAccount(targetId);
-    
     if (result.success) {
       alert("تم حذف المستخدم وكل بياناته بنجاح.");
-      await loadData(); // تحديث القائمة
-    } else {
-      alert(`حدث خطأ أثناء الحذف: ${result.error || "مجهول"}`);
-    }
+      await loadData();
+    } else alert(`حدث خطأ أثناء الحذف: ${result.error || "مجهول"}`);
     setProcessingId(null);
   };
 
@@ -87,37 +105,75 @@ export default function RolesManagementPage() {
         </div>
       </div>
 
+      {/* فلاتر البحث الجديدة */}
+      <Card className="bg-muted/20 border-dashed">
+        <CardContent className="p-4 flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="ابحث بالاسم أو رقم الهاتف..." 
+              className="pr-9 bg-background"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+            <select 
+              className="h-10 w-full md:w-auto rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={selectedLevel}
+              onChange={(e) => setSelectedLevel(e.target.value)}
+            >
+              <option value="all">جميع المستويات</option>
+              <option value="المستوى الصفري">المستوى الصفري</option>
+              <option value="المستوى الأول">المستوى الأول</option>
+              <option value="المستوى الثاني">المستوى الثاني</option>
+              <option value="المستوى الثالث">المستوى الثالث</option>
+              <option value="المستوى الرابع">المستوى الرابع</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>قائمة المستخدمين المسجلين</CardTitle>
-          <CardDescription>عدد الحسابات في قاعدة البيانات: {users.length}</CardDescription>
+          <CardDescription>عدد الحسابات المطابقة: {filteredUsers.length}</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <div className="min-w-[800px] p-6 pt-0">
             <table className="w-full text-sm text-right">
               <thead className="bg-muted/50 text-muted-foreground border-b">
                 <tr>
-                  <th className="px-4 py-3 font-medium">الاسم</th>
-                  <th className="px-4 py-3 font-medium">القسم / الهاتف</th>
+                  {/* تم ضبط محاذاة الاسم هنا (text-right) */}
+                  <th className="px-4 py-3 font-medium text-right w-1/4">الاسم</th>
+                  <th className="px-4 py-3 font-medium text-right w-1/4">القسم / الهاتف</th>
+                  <th className="px-4 py-3 font-medium text-center">المستوى</th>
                   <th className="px-4 py-3 font-medium text-center">حالة الصلاحية</th>
                   <th className="px-4 py-3 font-medium text-center">إجراءات الإدارة</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {users.map((user) => {
+                {filteredUsers.map((user) => {
                   const isAdmin = adminsList.includes(user.userId);
                   const isMe = user.userId === currentUserId;
                   const isProcessing = processingId === user.userId;
 
                   return (
                     <tr key={user.userId} className={`hover:bg-muted/30 transition-colors ${isMe ? 'bg-primary/5' : ''}`}>
-                      <td className="px-4 py-4 font-semibold flex items-center gap-2">
-                        {user.profile.name || "مستخدم بدون اسم"}
-                        {isMe && <Badge variant="outline" className="text-[10px] ml-2">أنت</Badge>}
+                      {/* تم ضبط محاذاة الداتا لتتطابق مع الهيدر */}
+                      <td className="px-4 py-4 font-semibold text-right">
+                        <div className="flex items-center gap-2 justify-start">
+                          <span>{user.profile.name || "مستخدم بدون اسم"}</span>
+                          {isMe && <Badge variant="outline" className="text-[10px] shrink-0">أنت</Badge>}
+                        </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm">{user.profile.department || "عام"}</div>
+                      <td className="px-4 py-4 text-right">
+                        <div className="text-sm font-medium">{user.computed.deptName}</div>
                         <div className="text-xs text-muted-foreground">{user.profile.phone || "-"}</div>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <Badge variant="outline" className="bg-background">{user.computed.levelName}</Badge>
                       </td>
                       <td className="px-4 py-4 text-center">
                         {isAdmin ? (
@@ -125,9 +181,7 @@ export default function RolesManagementPage() {
                             <ShieldCheck className="w-3 h-3 ml-1 inline-block" /> مدير نظام
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-muted">
-                            طالب مسجل
-                          </Badge>
+                          <Badge variant="secondary" className="bg-muted">طالب مسجل</Badge>
                         )}
                       </td>
                       <td className="px-4 py-4">
@@ -156,9 +210,9 @@ export default function RolesManagementPage() {
                     </tr>
                   );
                 })}
-                {users.length === 0 && (
+                {filteredUsers.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">لا يوجد مستخدمين مسجلين.</td>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">لا يوجد مستخدمين يطابقون بحثك.</td>
                   </tr>
                 )}
               </tbody>
