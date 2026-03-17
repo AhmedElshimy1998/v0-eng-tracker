@@ -17,13 +17,20 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadDepts = async () => {
-      const data = await getDepartments();
+  const loadDepts = async () => {
+    const data = await getDepartments();
+    // التأكد من وجود القسم العام بالاسم الصحيح في القائمة
+    const hasGeneral = data.some(d => d.id === "General");
+    if (!hasGeneral) {
+      const defaultGeneral = { id: "General", name: "المواد العامة (جامعة/كلية)" };
+      setDepartments([defaultGeneral, ...data]);
+    } else {
       setDepartments(data);
-      setIsLoading(false);
-    };
-    loadDepts();
-  }, []);
+    }
+    setIsLoading(false);
+  };
+  loadDepts();
+}, []);
 
   const handleAddDepartment = async () => {
     if (!newDeptName) return;
@@ -44,20 +51,20 @@ export default function AdminPage() {
       await saveDepartments(updated);
     }
   };
+// تحديد الاسم العربي للقسم المختار بدقة
+const currentDept = departments.find(d => d.id === selectedDeptId);
+const currentDeptName = currentDept ? currentDept.name : "المواد العامة (جامعة/كلية)";
 
-  // --- الإصلاح هنا: نجلب الاسم العربي للقسم المختار أولاً ---
-  const currentDept = departments.find(d => d.id === selectedDeptId);
-  const currentDeptName = currentDept ? currentDept.name : "المواد العامة";
-
-  // الفلترة الآن تتم بناءً على الاسم المكتوب في ملف الكورسات
-  const filteredCourses = coursesCatalog.filter(course => {
-    // لو القسم المختار هو "General" أو "المواد العامة"
-    if (selectedDeptId === "General") {
-      return course.department === "General" || course.department === "المواد العامة";
-    }
-    // لباقي الأقسام، نقارن بالاسم العربي
-    return course.department === currentDeptName;
-  });
+// الفلترة بناءً على الاسم الكامل
+const filteredCourses = coursesCatalog.filter(course => {
+  if (selectedDeptId === "General") {
+    // البحث بكل المسميات المحتملة للقسم العام لضمان الظهور
+    return course.department === "General" || 
+           course.department === "المواد العامة" || 
+           course.department === "المواد العامة (جامعة/كلية)";
+  }
+  return course.department === currentDeptName;
+});
 
   if (isLoading) return <div className="p-12 text-center"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary" /></div>;
 
