@@ -248,29 +248,53 @@ export default function SemesterTrackerPage() {
                       }
                     }
                     // فحص حالة القفل والسبب
-                    const check = checkCanTake([course.code], allStudentRecords, coursesCatalog);
-                    const isLocked = !check.canTake && !attempt;
+                    // 1. فحص حالة القفل والسبب
+                          const check = checkCanTake(course.prerequisites, allStudentRecords);
+                          const isLocked = !check.canTake && !attempt;
 
-                    return (
-                      <Tooltip key={`${course.code}-${attempt?.id || 'ideal'}`} delayDuration={300}>
-                        <TooltipTrigger asChild>
-                          <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle} ${isLocked ? 'cursor-help' : ''}`}>
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="font-semibold text-sm text-right">{course.arabicName}</div>
-                              {statusBadge}
+                          // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في الـ Tooltip
+                          const prereqDetails = course.prerequisites.map(pCode => {
+                            const pInfo = coursesCatalog.find(c => c.code === pCode);
+                            return `${pInfo?.arabicName || pCode} (${pCode})`;
+                          }).join(" - ");
+
+                                          return (
+                        <Tooltip key={`${course.code}-${attempt?.id || 'ideal'}`} delayDuration={200}>
+                          <TooltipTrigger asChild>
+                            <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all ${cardStyle} ${isLocked ? 'cursor-help' : ''}`}>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="font-semibold text-sm text-right">{course.arabicName}</div>
+                                {statusBadge}
+                              </div>
+                              <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
                             </div>
-                            <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
-                          </div>
-                        </TooltipTrigger>
-                        {isLocked && (
-                          <TooltipContent className="bg-destructive text-white p-2 text-xs shadow-xl border-none z-[100] text-right">
-                            <p className="font-bold border-b border-white/20 pb-1 mb-1">المادة مغلقة: {course.arabicName}</p>
-                            <p>الكود: {course.code}</p>
-                            <p className="mt-1 text-[10px] opacity-90">{check.reason}</p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    );
+                          </TooltipTrigger>
+                          
+                          {isLocked && (
+                            <TooltipContent 
+                              side="top" 
+                              className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[100] min-w-[250px] text-right"
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-red-500 font-bold border-b border-white/10 pb-2">
+                                  <span>⛔ انتبه: المادة مغلقة</span>
+                                </div>
+                                
+                                <div className="space-y-1">
+                                  <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
+                                  <p className="text-sm font-semibold text-slate-100 leading-relaxed">
+                                    {prereqDetails || "متطلب سابق غير محدد"}
+                                  </p>
+                                </div>
+                                
+                                <div className="pt-1 border-t border-white/5">
+                                  <p className="text-[10px] text-muted-foreground italic">تفتح المادة تلقائياً بمجرد نجاحك في المتطلبات أعلاه.</p>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      );
                   })}
                 </div>
               </div>
