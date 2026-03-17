@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Users, ShieldCheck, AlertTriangle, GraduationCap, TrendingUp, Activity, Loader2, BookX } from "lucide-react";
+import { BookOpen, Users, ShieldCheck, AlertTriangle, GraduationCap, TrendingUp, Activity, Loader2, BookX, BellRing } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -257,6 +257,26 @@ export default function AdminDashboardMain() {
           </Card>
         </Link>
       </div>
+
+{/* قسم كروت الخدمات وإدارة الموقع */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
+        {/* ... (الكروت الأربعة القديمة بتاعتك زي ما هما: اللوائح، المتابعة، التعثر، الصلاحيات) ... */}
+
+        {/* الكارت الخامس الجديد للإشعارات */}
+        <Link href="/admin/notifications">
+          <Card className="hover:border-primary transition-all cursor-pointer h-full group bg-muted/20">
+            <CardHeader>
+              <div className="bg-purple-500/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
+                {/* ضيف أيقونة BellRing في الـ import فوق لو مش موجودة */}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-purple-500"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></svg>
+              </div>
+              <CardTitle>نظام الإشعارات</CardTitle>
+              <CardDescription>إرسال تنبيهات موجهة للطلاب (إنذارات، خريجين، الخ).</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
+
     </div>
   );
 }

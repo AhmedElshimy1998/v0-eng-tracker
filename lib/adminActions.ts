@@ -109,3 +109,28 @@ export async function deleteUserAccount(targetUserId: string) {
     return { success: false, error: error.message };
   }
 }
+
+// --- ضف الكود ده في آخر ملف lib/adminActions.ts ---
+
+// 6. جلب ملاحظات المرشد الأكاديمي لطالب معين (سرية ومخفية عن الطالب)
+export async function getAdvisingNotes(studentId: string): Promise<string> {
+  try {
+    const isAdmin = await checkIsAdmin();
+    if (!isAdmin) return "";
+    return await kv.get<string>(`advising-notes-${studentId}`) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+// 7. حفظ ملاحظات المرشد الأكاديمي
+export async function saveAdvisingNotes(studentId: string, notes: string) {
+  try {
+    const isAdmin = await checkIsAdmin();
+    if (!isAdmin) throw new Error("Unauthorized");
+    await kv.set(`advising-notes-${studentId}`, notes);
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+}

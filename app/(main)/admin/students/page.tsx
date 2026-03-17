@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChevronDown, ChevronUp, Search, Filter } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, ChevronDown, ChevronUp, Search, Filter, BookOpen, Save } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-import { getAllStudents } from "@/lib/adminActions";
+import { getAllStudents, saveAdvisingNotes, getAdvisingNotes } from "@/lib/adminActions";
 import { getDepartments, DepartmentItem } from "@/lib/academicActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
@@ -176,6 +177,21 @@ export default function StudentsTrackingPage() {
                   </div>
 
                   <div>
+
+                    {/* --- سجل الجلسات الإرشادية (جديد) --- */}
+                  <div className="bg-background border rounded-lg p-4 mb-6 shadow-sm border-blue-500/20">
+                    <h4 className="font-semibold text-sm mb-2 text-blue-600 flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" /> سجل الجلسات الإرشادية (سري - يظهر للمرشدين فقط)
+                    </h4>
+                    <div className="flex gap-2 items-start">
+                      <textarea 
+                        className="flex-1 min-h-[80px] text-sm p-3 rounded-md border bg-muted/30 outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="سجل ملاحظاتك هنا عن حالة الطالب (مثال: تم عقد جلسة يوم كذا وتم نصح الطالب بـ...)"
+                        defaultValue={student.advisingNotes || ""} // هتحتاج تجيبها في الـ useEffect
+                        onBlur={(e) => saveAdvisingNotes(student.userId, e.target.value)}
+                      />
+                    </div>
+                  </div>
                     <h4 className="font-semibold mb-3 border-b pb-2">الفصول الدراسية المسجلة</h4>
                     <div className="grid md:grid-cols-2 gap-4">
                       {computed.activeSemesters.map((sem: any) => {
