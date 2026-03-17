@@ -68,3 +68,38 @@ export async function saveDepartments(departments: DepartmentItem[]) {
   }
 }
 
+
+export async function getStudentRecords() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    // جلب البيانات من Upstash
+    const records = await kv.get(`student_records:${userId}`);
+    return (records as any[]) || [];
+  } catch (error) {
+    console.error("Upstash KV Error:", error);
+    return [];
+  }
+}
+
+// 2. 
+
+export async function saveStudentRecord(courseCode: string, grade: string) {
+  try {
+    const { userId } = await auth();
+    if (!userId) throw new Error("Unauthorized");
+
+    const existingRecords: any[] = await getStudentRecords();
+    const updatedRecords = [
+      ...existingRecords.filter(r => r.courseCode !== courseCode),
+      { courseCode, grade, updatedAt: new Date().toISOString() }
+    ];
+
+    await kv.set(`student_records:${userId}`, updatedRecords);
+    return { success: true };
+  } catch (error) {
+    return { success: false };
+  }
+}
+
