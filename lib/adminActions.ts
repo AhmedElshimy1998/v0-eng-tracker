@@ -25,24 +25,38 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 }
 
-// 2. جلب كل الطلاب المسجلين
+// 2. جلب كل الطلاب المسجلين (متضمنة النوتس من الداتا بيز)
 export async function getAllStudents() {
   try {
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("Unauthorized");
 
-    // جلب كل المفاتيح اللي بتبدأ بـ academic-profile
-    const keys = await kv.keys('academic-profile-*');
-    if (keys.length === 0) return [];
+    const client = await clerkClient();
+    const clerkUsers = await client.users.getUserList({ limit: 500 });
 
-    // جلب بيانات كل المفاتيح
-    const studentsData = await Promise.all(keys.map(key => kv.get<AcademicProfile>(key)));
-    
-    // استخراج الـ ID من اسم المفتاح ودمجه مع البيانات
-    return studentsData.map((data, index) => ({
-      userId: keys[index].replace('academic-profile-', ''),
-      profile: data
-    })).filter(s => s.profile !== null);
+    const studentsData = await Promise.all(
+      clerkUsers.data.map(async (user) => {
+        const profile = await kv.get<AcademicProfile>(`academic-profile-${user.id}`);
+        // جلب النوتس المحفوظة من الداتا بيز
+        const advisingNotes = await kv.get<string>(`advising-notes-${user.id}`) || ""; 
+        
+        const fallbackName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.emailAddresses[0]?.emailAddress || "مستخدم بدون اسم";
+        const fallbackPhone = user.phoneNumbers[0]?.phoneNumber || "لا يوجد هاتف";
+
+        return {
+          userId: user.id,
+          advisingNotes, // إرسال النوتس للشاشة
+          profile: {
+            name: profile?.name || fallbackName,
+            phone: profile?.phone || fallbackPhone,
+            department: profile?.department || "لم يكمل الإعدادات",
+            semesters: profile?.semesters || []
+          }
+        };
+      })
+    );
+
+    return studentsData;
   } catch (error) {
     console.error("Error fetching students:", error);
     return [];
@@ -70,8 +84,6 @@ export async function toggleAdminStatus(targetUserId: string, makeAdmin: boolean
   }
 }
 
-// --- ضف الكود ده في آخر ملف lib/adminActions.ts ---
-
 // 4. جلب قائمة الـ IDs الخاصة بالمديرين
 export async function getSiteAdmins(): Promise<string[]> {
   try {
@@ -95,6 +107,7 @@ export async function deleteUserAccount(targetUserId: string) {
     await kv.del(`academic-profile-${targetUserId}`);
     await kv.del(`studyhub-cloud-data-${targetUserId}`); // داتا المذاكرة
     await kv.del(`push-subscriptions-${targetUserId}`);  // داتا الإشعارات
+    await kv.del(`advising-notes-${targetUserId}`); // مسح النوتس كمان
 
     // 3. لو كان أدمن، نمسحه من مصفوفة الأدمنز
     let admins = await kv.get<string[]>('site-admins') || [];
@@ -110,9 +123,7 @@ export async function deleteUserAccount(targetUserId: string) {
   }
 }
 
-// --- ضف الكود ده في آخر ملف lib/adminActions.ts ---
-
-// 6. جلب ملاحظات المرشد الأكاديمي لطالب معين (سرية ومخفية عن الطالب)
+// 6. جلب ملاحظات المرشد الأكاديمي لطالب معين
 export async function getAdvisingNotes(studentId: string): Promise<string> {
   try {
     const isAdmin = await checkIsAdmin();

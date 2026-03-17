@@ -179,16 +179,21 @@ export default function StudentsTrackingPage() {
                   <div>
 
                     {/* --- سجل الجلسات الإرشادية (جديد) --- */}
+                  {/* --- سجل الجلسات الإرشادية (حفظ تلقائي) --- */}
                   <div className="bg-background border rounded-lg p-4 mb-6 shadow-sm border-blue-500/20">
                     <h4 className="font-semibold text-sm mb-2 text-blue-600 flex items-center gap-2">
                       <BookOpen className="h-4 w-4" /> سجل الجلسات الإرشادية (سري - يظهر للمرشدين فقط)
                     </h4>
+                    <p className="text-[10px] text-muted-foreground mb-3 italic">ملاحظة: يتم حفظ التعديلات تلقائياً عند الخروج من المربع.</p>
                     <div className="flex gap-2 items-start">
                       <textarea 
                         className="flex-1 min-h-[80px] text-sm p-3 rounded-md border bg-muted/30 outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="سجل ملاحظاتك هنا عن حالة الطالب (مثال: تم عقد جلسة يوم كذا وتم نصح الطالب بـ...)"
-                        defaultValue={student.advisingNotes || ""} // هتحتاج تجيبها في الـ useEffect
-                        onBlur={(e) => saveAdvisingNotes(student.userId, e.target.value)}
+                        placeholder="سجل ملاحظاتك هنا عن حالة الطالب..."
+                        defaultValue={student.advisingNotes || ""} 
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          saveAdvisingNotes(student.userId, val);
+                        }}
                       />
                     </div>
                   </div>
