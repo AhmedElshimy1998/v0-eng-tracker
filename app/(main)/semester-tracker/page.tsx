@@ -68,8 +68,17 @@ export default function SemesterTrackerPage() {
 
   const allStudentRecords = useMemo(() => semesters.flatMap(sem => sem.courses), [semesters]);
   const effectiveRecords = useMemo(() => getEffectiveRecords(allStudentRecords), [allStudentRecords]);
-  const { gpa: cgpa, totalCredits: completedCredits, failedCredits } = useMemo(() => 
-    calculateGPA(effectiveRecords, coursesCatalog), [effectiveRecords]);
+  const { gpa: cgpa, failedCredits } = useMemo(() => 
+  calculateGPA(effectiveRecords, coursesCatalog), [effectiveRecords]);
+
+const completedCredits = useMemo(() => {
+  return effectiveRecords
+    .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade)) // منطق النجاح اللي حددناه
+    .reduce((sum, r) => {
+      const course = coursesCatalog.find(c => c.code === r.courseCode);
+      return sum + (course?.credits || 0);
+    }, 0);
+}, [effectiveRecords]);
 
   const warnings = useMemo(() => {
     let consecutiveWarnings = 0;

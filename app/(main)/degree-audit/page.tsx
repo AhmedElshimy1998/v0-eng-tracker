@@ -22,27 +22,36 @@ export default function DegreeAudit() {
           getDepartments()
         ]);
 
-        if (p) {
-          setProfile(p);
-          
-          // --- التعديل هنا لربط اسم القسم من لوحة الإدارة ---
-          const studentDeptId = p.department;
-          const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
-          const actualDeptName = deptObject ? deptObject.name : "لم يحدد بعد";
-          setDepartmentName(actualDeptName);
+            if (p) {
+      setProfile(p);
+      
+      const studentDeptId = p.department;
+      const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
+      const actualDeptName = deptObject ? deptObject.name : "لم يحدد بعد";
+      setDepartmentName(actualDeptName);
 
-          const semesters = p.semesters || [];
-          const allRecords = semesters.flatMap((s: any) => s.courses);
-          const effective = getEffectiveRecords(allRecords);
-          
-          // حساب الساعات بناءً على الكتالوج العام
-          const { totalCredits } = calculateGPA(effective, coursesCatalog);
-          
-          setStats({ 
-            total: totalCredits, 
-            percent: Math.min((totalCredits / 160) * 100, 100) 
-          });
-        }
+      const semesters = p.semesters || [];
+      const allRecords = semesters.flatMap((s: any) => s.courses);
+      const effective = getEffectiveRecords(allRecords);
+      
+      // 1. حساب الساعات "المنجزة بنجاح" فقط (Excluding F, Fail, Taken)
+      const completedCredits = effective
+        .filter((r: any) => !["F", "Fail", "Taken", "-"].includes(r.grade?.trim()))
+        .reduce((sum, r) => {
+          const course = coursesCatalog.find((c) => c.code === r.courseCode);
+          return sum + (course?.credits || 0);
+        }, 0);
+      
+      // 2. تحديث الإحصائيات بالساعات اللي عديت فيها فعلياً
+      setStats({ 
+        total: completedCredits, 
+        percent: Math.min((completedCredits / 160) * 100, 100) 
+      });
+
+      // ملاحظة: لو محتاج الـ GPA لسه في الصفحة، تقدر تحسبه كدة:
+      // const { gpa } = calculateGPA(effective, coursesCatalog);
+      // setGpa(gpa);
+    }
       } catch (error) {
         console.error("Error fetching audit data:", error);
       } finally {
