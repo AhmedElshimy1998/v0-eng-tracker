@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { User, Phone, GraduationCap, Save, Loader2 } from "lucide-react";
-import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem, AlertTriangle } from "@/lib/academicActions"; 
+import { User, Phone, GraduationCap, Save, Loader2, AlertTriangle} from "lucide-react";
+import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions"; 
 
 export default function SettingsPage() {
   const [name, setName] = useState("");
@@ -69,7 +69,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-      
+
       <Card>
         <CardHeader>
           <CardTitle>البيانات الشخصية والأكاديمية</CardTitle>
