@@ -3,7 +3,7 @@
 import { kv } from "@vercel/kv"
 import { auth, clerkClient } from "@clerk/nextjs/server"
 import { AcademicProfile } from "./academicActions"
-import { checkIsAdmin } from "./adminActions"
+
 
 
 export async function purgeOrphanedData() {
