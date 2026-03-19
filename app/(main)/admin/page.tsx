@@ -22,11 +22,12 @@ const levelNames = ["المستوى الصفري", "المستوى الأول", 
 
 export default function AdminDashboardMain() {
   const [stats, setStats] = useState({
-    totalStudents: 0,
-    avgGpa: 0,
-    atRisk: 0,
-    graduating: 0,
-    levelStats: {} as LevelStatsMap,
+  totalStudents: 0,
+  avgGpa: 0,
+  atRisk: 0,
+  atRiskList: [] as { name: string; reason: string; level: string; gpa: number }[], // القائمة الجديدة
+  graduating: 0,
+  levelStats: {} as LevelStatsMap,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -36,68 +37,95 @@ export default function AdminDashboardMain() {
   };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      const students = await getAllStudents();
+  const fetchStats = async () => {
+    // جلب قائمة الطلاب من قاعدة البيانات
+    const students = await getAllStudents(); 
+    
+    if (students.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    let totalGpa = 0;
+    let atRiskCount = 0;
+    let graduatingCount = 0;
+    let validGpaStudents = 0;
+    let tempAtRiskList: { name: string; reason: string; level: string; gpa: number }[] = [];
+
+    const lvlStats: LevelStatsMap = {};
+    levelNames.forEach(name => {
+      lvlStats[name] = { total: 0, gpaSum: 0, gpaCount: 0, atRisk: 0 };
+    });
+
+    students.forEach(student => {
+      const semesters = student.profile.semesters || [];
+      const allRecords = semesters.flatMap((s: any) => s.courses);
       
-      if (students.length === 0) {
-        setIsLoading(false);
-        return;
+      // جلب السجلات المؤثرة (أفضل تقدير لكل مادة)
+      const effectiveRecords = getEffectiveRecords(allRecords); 
+      
+      // حساب المعدل التراكمي الكلي (CGPA)
+      const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
+      
+      const level = getLevel(totalCredits);
+      lvlStats[level].total++;
+
+      // تحليل معدل آخر ترم مسجل للتأكد من حالة الإنذار الفصلي
+      const activeSemesters = semesters.filter((s: any) => s.courses.length > 0);
+      const lastSemester = activeSemesters[activeSemesters.length - 1];
+      let lastSemGpa = 4.0;
+      
+      if (lastSemester) {
+         const { gpa } = calculateGPA(lastSemester.courses, coursesCatalog);
+         lastSemGpa = gpa;
       }
 
-      let totalGpa = 0;
-      let atRiskCount = 0;
-      let graduatingCount = 0;
-      let validGpaStudents = 0;
-
-      const lvlStats: LevelStatsMap = {};
-      levelNames.forEach(name => {
-        lvlStats[name] = { total: 0, gpaSum: 0, gpaCount: 0, atRisk: 0 };
-      });
-
-      students.forEach(student => {
-        const semesters = student.profile.semesters || [];
-        const allRecords = semesters.flatMap((s: any) => s.courses);
-        const effectiveRecords = getEffectiveRecords(allRecords); 
-        const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
+      if (totalCredits > 0) {
+        totalGpa += cgpa;
+        validGpaStudents++;
+        lvlStats[level].gpaSum += cgpa;
+        lvlStats[level].gpaCount++;
         
-        const level = getLevel(totalCredits);
-        lvlStats[level].total++;
+        // منطق تحديد الطالب "المنذر" وسبب التعثر
+        const isCgpaLow = cgpa < 2.0;
+        const isLastSemLow = lastSemGpa < 2.0;
 
-        const activeSemesters = semesters.filter((s: any) => s.courses.length > 0);
-        const lastSemester = activeSemesters[activeSemesters.length - 1];
-        let lastSemGpa = 4.0;
-        if (lastSemester) {
-           const { gpa } = calculateGPA(lastSemester.courses, coursesCatalog);
-           lastSemGpa = gpa;
+        if (isCgpaLow || isLastSemLow) {
+          atRiskCount++;
+          lvlStats[level].atRisk++;
+
+          // تحديد الأسباب بدقة لعرضها في الـ UI
+          let reasons = [];
+          if (isCgpaLow) reasons.push("تراكمي < 2.0");
+          if (isLastSemLow) reasons.push("فصلي < 2.0");
+
+          tempAtRiskList.push({
+            name: student.profile.name || "مستخدم بدون اسم",
+            level: level,
+            reason: reasons.join(" و "),
+            gpa: cgpa
+          });
         }
 
-        if (totalCredits > 0) {
-          totalGpa += cgpa;
-          validGpaStudents++;
-          lvlStats[level].gpaSum += cgpa;
-          lvlStats[level].gpaCount++;
-          
-          if (cgpa < 2.0 || lastSemGpa < 2.0) {
-            atRiskCount++;
-            lvlStats[level].atRisk++;
-          }
-          if (totalCredits >= 130) graduatingCount++; 
-        }
-      });
+        // حساب عدد الخريجين المتوقعين (أكثر من 130 ساعة)
+        if (totalCredits >= 130) graduatingCount++; 
+      }
+    });
 
-      setStats({
-        totalStudents: students.length,
-        avgGpa: validGpaStudents > 0 ? totalGpa / validGpaStudents : 0,
-        atRisk: atRiskCount,
-        graduating: graduatingCount,
-        levelStats: lvlStats,
-      });
-      
-      setIsLoading(false);
-    };
+    setStats({
+      totalStudents: students.length,
+      avgGpa: validGpaStudents > 0 ? totalGpa / validGpaStudents : 0,
+      atRisk: atRiskCount,
+      atRiskList: tempAtRiskList, // تخزين القائمة المفصلة
+      graduating: graduatingCount,
+      levelStats: lvlStats,
+    });
+    
+    setIsLoading(false);
+  };
 
-    fetchStats();
-  }, []);
+  fetchStats();
+}, []);
 
   return (
     <div className="flex-1 space-y-8 p-4 md:p-8 pt-6">
@@ -162,34 +190,40 @@ export default function AdminDashboardMain() {
             </Card>
 
             {/* الطلاب المنذرين */}
-            <Card className={`relative group cursor-pointer transition-colors overflow-visible ${stats.atRisk > 0 ? "border-red-500/50 bg-red-500/5" : ""}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">الطلاب المنذرين</CardTitle>
-                <AlertTriangle className={`h-4 w-4 ${stats.atRisk > 0 ? "text-red-500" : "text-muted-foreground"}`} />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${stats.atRisk > 0 ? "text-red-500" : ""}`}>{stats.atRisk}</div>
-                <p className="text-xs text-red-500/80 font-medium">تراكمي أو فصلي &lt; 2.0</p>
-              </CardContent>
-              {stats.atRisk > 0 && (
-                 <div className="absolute top-full mt-2 left-0 w-full z-50 hidden group-hover:block">
-                  <div className="bg-popover text-popover-foreground border shadow-xl rounded-md p-3 text-sm flex flex-col gap-2">
-                    <h4 className="font-bold border-b pb-1 mb-1 text-xs text-muted-foreground">نسبة الإنذار حسب المستوى:</h4>
-                    {levelNames.map(lvl => {
-                      const riskCount = stats.levelStats[lvl]?.atRisk || 0;
-                      if (riskCount === 0) return null;
-                      const percentage = ((riskCount / stats.atRisk) * 100).toFixed(1);
-                      return (
-                        <div key={lvl} className="flex justify-between items-center text-xs">
-                          <span>{lvl}</span>
-                          <span className="text-red-500 font-bold">{percentage}%</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </Card>
+            {/* الطلاب المنذرين */}
+<Card className={`relative group cursor-pointer transition-colors overflow-visible ${stats.atRisk > 0 ? "border-red-500/50 bg-red-500/5" : ""}`}>
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <CardTitle className="text-sm font-medium">الطلاب المنذرين</CardTitle>
+    <AlertTriangle className={`h-4 w-4 ${stats.atRisk > 0 ? "text-red-500" : "text-muted-foreground"}`} />
+  </CardHeader>
+  <CardContent>
+    <div className={`text-2xl font-bold ${stats.atRisk > 0 ? "text-red-500" : ""}`}>{stats.atRisk}</div>
+    <p className="text-xs text-red-500/80 font-medium">تراكمي أو فصلي &lt; 2.0</p>
+  </CardContent>
+
+  {/* عرض قائمة الطلاب عند الـ Hover */}
+  {stats.atRisk > 0 && (
+     <div className="absolute top-full mt-2 left-0 w-80 z-50 hidden group-hover:block">
+      <div className="bg-popover text-popover-foreground border shadow-xl rounded-md p-3 text-sm flex flex-col gap-2">
+        <h4 className="font-bold border-b pb-2 mb-1 text-xs text-red-500 flex items-center justify-between">
+          <span>قائمة الطلاب المنذرين:</span>
+          <Badge variant="destructive" className="text-[10px]">{stats.atRisk}</Badge>
+        </h4>
+        <div className="max-h-48 overflow-y-auto space-y-2">
+          {stats.atRiskList.map((student, idx) => (
+            <div key={idx} className="flex flex-col border-b border-muted pb-1 last:border-0">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-xs">{student.name}</span>
+                <span className="text-[10px] text-muted-foreground">{student.level}</span>
+              </div>
+              <span className="text-[10px] text-red-500 font-medium italic">السبب: إنذار {student.reason}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+</Card>
 
             {/* الخريجون المتوقعون */}
             <Card>
