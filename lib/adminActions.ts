@@ -4,64 +4,6 @@ import { kv } from "@vercel/kv"
 import { auth, clerkClient } from "@clerk/nextjs/server"
 import { AcademicProfile } from "./academicActions"
 
-
-
-export async function purgeOrphanedData() {
-  try {
-    const isAdmin = await checkIsAdmin();
-    if (!isAdmin) throw new Error("غير مصرح لك");
-
-    // 1. جلب قائمة كل الـ IDs النشطة من Clerk حالياً
-    const client = await clerkClient();
-    const activeUsers = await client.users.getUserList({ limit: 500 });
-    const activeUserIds = new Set(activeUsers.data.map(u => u.id));
-
-    // 2. البحث عن كل المفاتيح التي تبدأ بـ "student_records"
-    // ملاحظة: kv.keys ممكن تتطلب إعدادات معينة في Upstash، لو منفعش نستخدم scan
-    const allRecordKeys = await kv.keys('student_records:*');
-    const allProfileKeys = await kv.keys('academic-profile-*');
-    
-    const keysToDelete: string[] = [];
-
-    // فحص سجلات الدرجات
-    allRecordKeys.forEach(key => {
-      const id = key.split(':')[1];
-      if (!activeUserIds.has(id)) {
-        keysToDelete.push(key);
-      }
-    });
-
-    // فحص البروفايلات
-    allProfileKeys.forEach(key => {
-      const id = key.replace('academic-profile-', '');
-      if (!activeUserIds.has(id)) {
-        keysToDelete.push(key);
-        // إضافة باقي المفاتيح المرتبطة بهذا الـ ID المفقود
-        keysToDelete.push(`studyhub-cloud-data-${id}`);
-        keysToDelete.push(`push-subscriptions-${id}`);
-        keysToDelete.push(`advising-notes-${id}`);
-        keysToDelete.push(`last_ai_analysis:${id}`);
-      }
-    });
-
-    if (keysToDelete.length === 0) {
-      return { success: true, message: "لا توجد داتا يتيمة، قاعدة البيانات نظيفة تماماً." };
-    }
-
-    // 3. التنفيذ الفعلي للحذف الشامل
-    await Promise.all(keysToDelete.map(key => kv.del(key)));
-
-    return { 
-      success: true, 
-      message: `تم بنجاح حذف ${keysToDelete.length} مفتاح داتا يتيمة كانت مسببة لمشاكل.` 
-    };
-
-  } catch (error: any) {
-    console.error("Purge Error:", error);
-    return { success: false, error: error.message };
-  }
-}
-
 // 1. فحص هل المستخدم الحالي أدمن؟
 export async function checkIsAdmin(): Promise<boolean> {
   try {

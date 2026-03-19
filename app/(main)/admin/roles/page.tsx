@@ -8,7 +8,7 @@ import { Loader2, ShieldCheck, UserX, Search, Filter } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { Input } from "@/components/ui/input";
 
-import { getAllStudents, toggleAdminStatus, getSiteAdmins, deleteUserAccount, purgeOrphanedData } from "@/lib/adminActions";
+import { getAllStudents, toggleAdminStatus, getSiteAdmins, deleteUserAccount } from "@/lib/adminActions";
 import { getDepartments, DepartmentItem } from "@/lib/academicActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
@@ -153,12 +153,6 @@ export default function RolesManagementPage() {
                   <th className="px-4 py-3 font-medium text-center">إجراءات الإدارة</th>
                 </tr>
               </thead>
-              <Button onClick={async () => {
-              const res = await purgeOrphanedData();
-              alert(res.message);
-            }} variant="destructive">
-              تنظيف الداتا اليتيمة 🧹
-            </Button>
               <tbody className="divide-y divide-border">
                 {filteredUsers.map((user) => {
                   const isAdmin = adminsList.includes(user.userId);
