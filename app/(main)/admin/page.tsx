@@ -25,6 +25,7 @@ export default function AdminDashboardMain() {
     totalStudents: 0,
     avgGpa: 0,
     atRisk: 0,
+    atRiskList: [] as { name: string; reason: string; level: string; gpa: number }[], // القائمة الجديدة
     graduating: 0,
     levelStats: {} as LevelStatsMap,
   });
@@ -36,68 +37,76 @@ export default function AdminDashboardMain() {
   };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      const students = await getAllStudents();
+  const fetchStats = async () => {
+    const students = await getAllStudents(); // جلب البيانات
+    
+    if (students.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    let totalGpa = 0;
+    let atRiskCount = 0;
+    let graduatingCount = 0;
+    let validGpaStudents = 0;
+    const lvlStats: LevelStatsMap = {};
+
+    levelNames.forEach(name => {
+      lvlStats[name] = { total: 0, gpaSum: 0, gpaCount: 0, atRisk: 0 };
+    });
+
+    students.forEach(student => {
+      const semesters = student.profile.semesters || [];
+      const allRecords = semesters.flatMap((s: any) => s.courses);
+      const effectiveRecords = getEffectiveRecords(allRecords); //
+      const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog); //
       
-      if (students.length === 0) {
-        setIsLoading(false);
-        return;
+      const level = getLevel(totalCredits);
+      lvlStats[level].total++;
+
+      // --- الجزء السحري هنا لفلترة الأترم الـ Taken ---
+      // بنفلتر الأترم اللي "خلصت فعلاً" بس (اللي مجموع ساعاتها أكبر من صفر)
+      const finishedSemesters = semesters.filter((s: any) => {
+         const { totalCredits: semCredits } = calculateGPA(s.courses, coursesCatalog);
+         return semCredits > 0; 
+      });
+
+      const lastFinishedSemester = finishedSemesters[finishedSemesters.length - 1];
+      let lastSemGpa = 4.0; // افتراضي للطالب المستجد
+      if (lastFinishedSemester) {
+         const { gpa } = calculateGPA(lastFinishedSemester.courses, coursesCatalog);
+         lastSemGpa = gpa;
       }
 
-      let totalGpa = 0;
-      let atRiskCount = 0;
-      let graduatingCount = 0;
-      let validGpaStudents = 0;
-
-      const lvlStats: LevelStatsMap = {};
-      levelNames.forEach(name => {
-        lvlStats[name] = { total: 0, gpaSum: 0, gpaCount: 0, atRisk: 0 };
-      });
-
-      students.forEach(student => {
-        const semesters = student.profile.semesters || [];
-        const allRecords = semesters.flatMap((s: any) => s.courses);
-        const effectiveRecords = getEffectiveRecords(allRecords); 
-        const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
+      if (totalCredits > 0) {
+        totalGpa += cgpa;
+        validGpaStudents++;
+        lvlStats[level].gpaSum += cgpa;
+        lvlStats[level].gpaCount++;
         
-        const level = getLevel(totalCredits);
-        lvlStats[level].total++;
-
-        const activeSemesters = semesters.filter((s: any) => s.courses.length > 0);
-        const lastSemester = activeSemesters[activeSemesters.length - 1];
-        let lastSemGpa = 4.0;
-        if (lastSemester) {
-           const { gpa } = calculateGPA(lastSemester.courses, coursesCatalog);
-           lastSemGpa = gpa;
+        // لو المعدل التراكمي أقل من 2 أو آخر ترم خلصته بجد أقل من 2
+        if (cgpa < 2.0 || lastSemGpa < 2.0) {
+          atRiskCount++;
+          lvlStats[level].atRisk++;
         }
+        
+        if (totalCredits >= 130) graduatingCount++; 
+      }
+    });
 
-        if (totalCredits > 0) {
-          totalGpa += cgpa;
-          validGpaStudents++;
-          lvlStats[level].gpaSum += cgpa;
-          lvlStats[level].gpaCount++;
-          
-          if (cgpa < 2.0 || lastSemGpa < 2.0) {
-            atRiskCount++;
-            lvlStats[level].atRisk++;
-          }
-          if (totalCredits >= 130) graduatingCount++; 
-        }
-      });
+    setStats({
+      totalStudents: students.length,
+      avgGpa: validGpaStudents > 0 ? totalGpa / validGpaStudents : 0,
+      atRisk: atRiskCount, // الرقم دلوقتى هيكون 0 عندك يا هندسة
+      graduating: graduatingCount,
+      levelStats: lvlStats,
+    });
+    
+    setIsLoading(false);
+  };
 
-      setStats({
-        totalStudents: students.length,
-        avgGpa: validGpaStudents > 0 ? totalGpa / validGpaStudents : 0,
-        atRisk: atRiskCount,
-        graduating: graduatingCount,
-        levelStats: lvlStats,
-      });
-      
-      setIsLoading(false);
-    };
-
-    fetchStats();
-  }, []);
+  fetchStats();
+}, []);
 
   return (
     <div className="flex-1 space-y-8 p-4 md:p-8 pt-6">
