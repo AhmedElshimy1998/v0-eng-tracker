@@ -96,30 +96,41 @@ export async function getSiteAdmins(): Promise<string[]> {
 // 5. الحذف النهائي للمستخدم (من Clerk ومن Upstash)
 export async function deleteUserAccount(targetUserId: string) {
   try {
+    // 1. فحص صلاحيات الإدمن قبل البدء
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("غير مصرح لك بإجراء هذا التعديل");
 
-    // 1. الحذف من نظام التوثيق Clerk
+    // 2. الحذف من نظام التوثيق Clerk (عشان يقفل حسابه تماماً)
     const client = await clerkClient();
     await client.users.deleteUser(targetUserId);
 
-    // 2. مسح كل الداتا بتاعته من قاعدة بيانات Upstash
-    await kv.del(`academic-profile-${targetUserId}`);
-    await kv.del(`studyhub-cloud-data-${targetUserId}`); // داتا المذاكرة
-    await kv.del(`push-subscriptions-${targetUserId}`);  // داتا الإشعارات
-    await kv.del(`advising-notes-${targetUserId}`); // مسح النوتس كمان
+    // 3. مسح كافة السجلات المرتبطة بالـ ID في Upstash KV
+    // تم تجميع كافة المفاتيح التي اكتشفناها لضمان الحذف الكامل
+    await Promise.all([
+      kv.del(`academic-profile-${targetUserId}`),    // البروفايل والأترام
+      kv.del(`student_records:${targetUserId}`),     // سجل الدرجات التاريخي (كان ناقصاً)
+      kv.del(`studyhub-cloud-data-${targetUserId}`), // داتا الـ Tracker والمذاكرة
+      kv.del(`push-subscriptions-${targetUserId}`),  // اشتراكات الإشعارات
+      kv.del(`advising-notes-${targetUserId}`),      // ملاحظات الإرشاد الأكاديمي
+      kv.del(`last_ai_analysis:${targetUserId}`)     // توقيت تحليل الـ AI (لتصفير العداد)
+    ]);
 
-    // 3. لو كان أدمن، نمسحه من مصفوفة الأدمنز
+    // 4. إذا كان المستخدم مديراً، يتم حذفه من قائمة الـ Admins
     let admins = await kv.get<string[]>('site-admins') || [];
     if (admins.includes(targetUserId)) {
       admins = admins.filter(id => id !== targetUserId);
       await kv.set('site-admins', admins);
     }
 
+    console.log(`[Success] User ${targetUserId} and all associated data have been deleted.`);
     return { success: true };
+
   } catch (error: any) {
-    console.error("Error deleting user:", error);
-    return { success: false, error: error.message };
+    console.error("Error during full user deletion:", error);
+    return { 
+      success: false, 
+      error: error.message || "حدث خطأ غير متوقع أثناء عملية الحذف الشامل." 
+    };
   }
 }
 
