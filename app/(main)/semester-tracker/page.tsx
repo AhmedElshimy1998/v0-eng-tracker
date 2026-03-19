@@ -321,31 +321,48 @@ const level = getStudentLevel(completedCredits);
                         );
 
                         // 4. الحل النهائي: لو الكارت رمادي (مغلق)، حط النافذة.. لو أي حاجة تانية، رجع الكارت "حاف"
+                        // الحل النهائي: استخدام نظام الـ group-hover اليدوي بدلاً من الـ Tooltip
                         if (isLockedCard) {
                           return (
-                            <TooltipProvider key={`${course.code}-locked`}>
-                              <Tooltip delayDuration={200}>
-                                <TooltipTrigger asChild>
-                                  {cardElement}
-                                </TooltipTrigger>
-                                <TooltipContent 
-                                  side="top" 
-                                  className="bg-[#0f0f0f] text-white border border-red-500/50 p-4 rounded-xl shadow-2xl z-[500] min-w-[250px] text-right"
-                                >
-                                  <div className="space-y-3">
-                                    <div className="flex items-center justify-end gap-2 text-red-500 font-bold border-b border-white/10 pb-2">
-                                      <span>⛔ انتبه: المادة مغلقة</span>
+                            <div key={`${course.code}-locked`} className="relative group cursor-help overflow-visible h-full">
+                              {/* الكارت الأساسي (باهت لأنه مغلق) - نفس ستايلك الأصلي */}
+                              <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all h-full ${cardStyle}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="font-semibold text-sm text-right">{course.arabicName}</div>
+                                  {statusBadge}
+                                </div>
+                                <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
+                              </div>
+
+                              {/* النافذة المنبثقة (تظهر عند الـ Hover أو اللمس) - نسخة طبق الأصل من كارت الإدارة */}
+                              <div className="absolute top-full mt-2 right-0 w-64 z-[100] hidden group-hover:block animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="bg-popover text-popover-foreground border shadow-xl rounded-md p-3 text-sm flex flex-col gap-2 border-red-500/50">
+                                  
+                                  {/* عنوان الهوفر - نفس ستايل هيدر الإدارة */}
+                                  <h4 className="font-bold border-b pb-1 mb-1 text-xs text-muted-foreground flex items-center justify-end gap-1.5">
+                                    <span>متطلبات التسجيل</span>
+                                  </h4>
+                                  
+                                  {/* محتوى الهوفر - الحفاظ على النص الكامل للمتطلبات */}
+                                  <div className="flex flex-col gap-1.5 text-right mt-1">
+                                    {/* جملة عليك اجتياز المتطلبات التالية: */}
+                                    <div className="text-xs text-red-500/80 font-medium italic">
+                                      عليك اجتياز المتطلبات التالية:
                                     </div>
-                                    <div className="space-y-1 text-right">
-                                      <p className="text-[11px] text-muted-foreground font-medium">عليك اجتياز المتطلبات التالية:</p>
-                                      <p className="text-sm font-semibold text-slate-100 leading-relaxed">
-                                        {prereqDetails}
-                                      </p>
+                                    
+                                    {/* قائمة المواد المطلوبة - بخط بولد وشيك */}
+                                    <div className="text-xs font-semibold leading-relaxed text-slate-100 bg-red-500/10 p-2 rounded border border-red-500/10">
+                                      {prereqDetails}
                                     </div>
                                   </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+
+                                  {/* سهم صغير ليعطي شكل الـ Tooltip الاحترافي */}
+                                  <div className="absolute bottom-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-popover"></div>
+                                  {/* حدود صغيرة للسهم لتتناسب مع حدود الكارد */}
+                                  <div className="absolute bottom-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-red-500/50 -mb-[1px]"></div>
+                                </div>
+                              </div>
+                            </div>
                           );
                         }
 
