@@ -12,6 +12,9 @@ import { getDepartments, DepartmentItem } from "@/lib/academicActions";
 import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
 import { coursesCatalog } from "@/lib/courses";
 
+
+
+
 export default function StudentsTrackingPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
@@ -55,6 +58,14 @@ export default function StudentsTrackingPage() {
       let lastSemStats = null;
       let lastSemTakenHours = 0;
       
+      // ✅ الحل: حسبة ساعات النجاح الفعلية فقط (استبعاد F, Fail, Taken)
+    const passedCredits = effectiveRecords
+      .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade))
+      .reduce((sum, r) => {
+        const course = coursesCatalog.find(c => c.code === r.courseCode);
+        return sum + (course?.credits || 0);
+      }, 0);
+
       if (lastSemester) {
         lastSemStats = calculateGPA(lastSemester.courses, coursesCatalog);
         lastSemester.courses.forEach((c: any) => {
@@ -63,14 +74,14 @@ export default function StudentsTrackingPage() {
         });
       }
 
-      const levelName = getLevel(totalCredits);
+      const levelName = getLevel(passedCredits);
       // توحيد اسم القسم بناءً على الداتا بيز بتاعة الإدارة
       const deptName = departments.find(d => d.id === profile.department)?.name || (profile.department === "General" ? "المواد العامة" : profile.department);
 
       return {
         ...student,
         computed: {
-          cgpa, totalCredits, failedCredits, activeSemesters, lastSemStats, lastSemTakenHours, levelName, deptName
+          cgpa, totalCredits, failedCredits, activeSemesters, lastSemStats, lastSemTakenHours, levelName, deptName, passedCredits
         }
       };
     }).filter(student => {
@@ -149,18 +160,18 @@ export default function StudentsTrackingPage() {
                 <div className="flex items-center gap-4">
                   <div className="text-right hidden md:block">
                     <p className="text-sm font-semibold">التراكمي: <span className={computed.cgpa >= 2 ? "text-green-500" : "text-red-500"}>{computed.cgpa.toFixed(2)}</span></p>
-                    <p className="text-xs text-muted-foreground">ساعات النجاح: {computed.totalCredits}</p>
+                    <p className="text-xs text-muted-foreground">ساعات النجاح: {computed.passedCredits}</p>
                   </div>
                   {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                 </div>
               </div>
-
+                  
               {isExpanded && (
                 <div className="border-t bg-muted/10 p-4 space-y-6">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                     <div className="bg-background border p-3 rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">إجمالي ساعات النجاح</p>
-                      <p className="font-bold text-lg text-green-500">{computed.totalCredits}</p>
+                      <p className="font-bold text-lg text-green-500">{computed.passedCredits}</p>
                     </div>
                     <div className="bg-background border p-3 rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">ساعات الرسوب الكلية</p>
