@@ -12,7 +12,7 @@ export default function MainLayout({
 }) {
   const pathname = usePathname()
   const isLandingPage = pathname === "/"
-  const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+  const isAuthPage = pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up") || pathname.startsWith("/news");
 
   // المتغير ده بيحدد إحنا في صفحة عامة ولا جوه النظام
   const hideNavigation = isLandingPage || isAuthPage;
