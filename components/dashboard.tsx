@@ -3,6 +3,7 @@
 import { useStudy } from "@/lib/study-context"
 import { SubjectCard } from "@/components/subject-card"
 import { DeadlinesWidget } from "@/components/deadlines-widget"
+import { NewsWidget } from "@/components/news-widget"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BookOpen, CheckCircle2, Clock, GraduationCap } from "lucide-react"
 import { useMemo } from "react"
@@ -129,7 +130,8 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div>
+        <div className="space-y-6">
+          <NewsWidget />
           <DeadlinesWidget />
         </div>
       </div>

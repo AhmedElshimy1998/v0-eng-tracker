@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, Settings, Shield, Map, Calculator, Menu, X , BrainCircuit} from "lucide-react"
+import { LayoutDashboard, BookOpen, Calendar, Sun, Moon, GraduationCap, Settings, Shield, Map, Calculator, Menu, X , BrainCircuit, Newspaper} from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -17,6 +17,7 @@ const navigation = [
   { name: "AI Smart Advisor", href: "/ai-mentor", icon: BrainCircuit },
   { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map }, 
   { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator }, 
+  { name: "الأخبار والإشعارات", href: "/news", icon: Newspaper },
   { name: "Settings", href: "/settings", icon: Settings },
   { name: "Admin Dashboard", href: "/admin", icon: Shield, adminOnly: true }, 
 ]
