@@ -39,7 +39,7 @@ export type CourseCategory =
   | 'متطلبات جامعة (اختياري)'
   | 'متطلبات كلية (إجباري)'
   | 'متطلبات كلية (اختياري)'
-  | 'متطلبات التخصص (إجباري)'
+  | 'متطلبات تخصص (إجباري)'
   | 'تخصص (اختياري عام)'
   | 'تخصص دقيق (اختياري)';
 
@@ -53,6 +53,10 @@ export interface Course {
   prerequisites: string[];      // مصفوفة بأكواد المواد المتطلبة (لو مفيش بتبقى فاضية [])
   idealSemester: string;        // الترم المثالي اللي المادة بتنزل فيه
   department: string;           // القسم التابع ليه المادة (General, Mechatronics, الخ)
+  exclusiveGroupId?: string; 
+  electiveGroupId?: string;
+  isPlaceholder?: boolean;
+  requireAnyPrereq?: boolean;
 }
 
 // هيكل المادة اللي الطالب سجلها بالفعل (تاريخ الطالب)

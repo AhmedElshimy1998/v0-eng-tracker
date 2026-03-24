@@ -7,7 +7,7 @@ export const coursesCatalog: Course[] = [
   { code: "HUM 131", arabicName: "مقدمة الي البرمجة وتكنولوجيا المعلومات", englishName: "Intro to Computer & Prog.", credits: 2, category: "متطلبات جامعة (إجباري)", prerequisites: [], idealSemester: "Level One - Term 1", department: "المواد العامة (جامعة/كلية)" },
   { code: "HUM X32", arabicName: "مهارات الاتصال والعرض والتقديم", englishName: "Comm. & Pres. Skills", credits: 2, category: "متطلبات جامعة (إجباري)", prerequisites: [], idealSemester: "Level Three - Term 1", department: "المواد العامة (جامعة/كلية)" },
   { code: "HUM X33", arabicName: "التفكير العلمي", englishName: "Scientific Thinking", credits: 2, category: "متطلبات جامعة (إجباري)", prerequisites: [], idealSemester: "Level Three - Term 2", department: "المواد العامة (جامعة/كلية)" },
-  { code: "HUM XE8", arabicName: "مهارات الاسعافات الاولية", englishName: "First Aid Skills", credits: 2, category: "متطلبات جامعة (اختياري)", prerequisites: [], idealSemester: "Level One - Term 1", department: "المواد العامة (جامعة/كلية)" },
+  
   { code: "HUM XE2", arabicName: "اللغة الالمانية", englishName: "German Language", credits: 2, category: "متطلبات جامعة (اختياري)", prerequisites: [], idealSemester: "Level Four - Term 2", department: "المواد العامة (جامعة/كلية)" },
   
   // مواد الكلية الإجبارية (تتبع أيضاً المواد العامة حسب طلبك)
@@ -61,13 +61,31 @@ export const coursesCatalog: Course[] = [
   { code: "MPE 461", arabicName: "مشروع التخرج (1)", englishName: "Graduation Project 1", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["Completion of 112 credits", "ENG X61", "HUM X32"], idealSemester: "Level Four - Term 1", department: "هندسة الميكاترونيات" },
   { code: "MPE 451", arabicName: "التحكم في العمليات الصناعية", englishName: "Industrial Process Control", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 252"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات" },
   { code: "PDE 421", arabicName: "ماكينات التشغيل بالتحكم العددي", englishName: "CNC Machines", credits: 2, category: "متطلبات تخصص (إجباري)", prerequisites: ["CCE 211", "MPE 111"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات" },
-  { code: "MPE 455", arabicName: "نظم التحكم المؤازر", englishName: "Servo Control Systems", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 351"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات" },
-  { code: "CCE 411", arabicName: "رؤية الالة", englishName: "Machine Vision", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["CCE 211"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات" },
+  
   { code: "MPE 462", arabicName: "مشروع التخرج (2)", englishName: "Graduation Project 2", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 461"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات" },
   
   // مواد اختيارية تخصص
   { code: "ENG XE1", arabicName: "الاقتصاد الهندسي ودراسات الجدوي", englishName: "Eng. Economy", credits: 2, category: "تخصص (اختياري عام)", prerequisites: [], idealSemester: "Level Two - Term 2", department: "هندسة الميكاترونيات" },
-  { code: "MPE 453", arabicName: "الميكاترونيات الحيوية", englishName: "Bio-Mechatronics", credits: 3, category: "تخصص دقيق (اختياري)", prerequisites: ["MPE 252"], idealSemester: "Level Four - Term 1", department: "هندسة الميكاترونيات" },
+  
+
+
+  // مواد ذات مفاضله فردية
+  { code: "PLACE_HUM_1", arabicName: "الإسعافات الأولية / القانون والأخلاقيات", englishName: "First Aid / Ethics", credits: 2, category: "متطلبات جامعة (اختياري)", prerequisites: [], idealSemester: "Level One - Term 1", department: "المواد العامة (جامعة/كلية)", isPlaceholder: true, exclusiveGroupId: "exc_hum_1" },
+  { code: "HUM XE8", arabicName: "مهارات الاسعافات الاولية", englishName: "First Aid Skills", credits: 2, category: "متطلبات جامعة (اختياري)", prerequisites: [], idealSemester: "Level One - Term 1", department: "المواد العامة (جامعة/كلية)", exclusiveGroupId: "exc_hum_1" },
+  { code: "HUM XE1", arabicName: "القانون والاخلاقيات في الهندسة", englishName: "Law and Ethics in Engineering", credits: 2, category: "متطلبات جامعة (اختياري)", prerequisites: [], idealSemester: "Level One - Term 1", department: "المواد العامة (جامعة/كلية)", exclusiveGroupId: "exc_hum_1" },
+
+  { code: "PLACE_MPE_1", arabicName: "مقرر اختياري 1", englishName: "Elective Course 1", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 252"], idealSemester: "Level Four - Term 1", department: "هندسة الميكاترونيات", isPlaceholder: true, exclusiveGroupId: "exc_MPE_1" },
+  { code: "MPE 453", arabicName: "الميكاترونيات الحيوية", englishName: "Bio-Mechatronics", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 252"], idealSemester: "Level Four - Term 1", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_1" },
+  { code: "PDE 431", arabicName: "مقدمة إلي الانظمة الميكروالكتروميكانيكية", englishName: "Introductions to Microelectromechanical Systems", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 252"], idealSemester: "Level Four - Term 1", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_1" },
+  
+  { code: "PLACE_MPE_2", arabicName: "مقرر اختياري 2", englishName: "Elective Course 2", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 351", "MPE 121"], requireAnyPrereq: true, idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", isPlaceholder: true, exclusiveGroupId: "exc_MPE_2" },
+  { code: "MPE 455", arabicName: "نظم التحكم المؤازر", englishName: "Servo Control Systems", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 351"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_2" },
+  { code: "MPE 454", arabicName: "انظمة الطاقة المتجدده", englishName: "Renewable Energy Systems", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 121"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_2" },
+  
+  { code: "PLACE_MPE_3", arabicName: "مقرر اختياري 3", englishName: "Elective Course 3", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["CCE 211", "EEC 111"], requireAnyPrereq: true, idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", isPlaceholder: true, exclusiveGroupId: "exc_MPE_3" },
+  { code: "CCE 411", arabicName: "رؤية الالة", englishName: "Machine Vision", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["CCE 211"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_3" },
+  { code: "EEC 412", arabicName: "تصميم الدوائر المتكامله ذات النطاق الواسع جدا", englishName: "VLSI Design", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["EEC 111"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_3" },
+  
 
   // مواد طاقه
   { code: "MPE 462", arabicName: "ماده للاختبار", englishName: "test path", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 461"], idealSemester: "Level Four - Term 2", department: "هندسة الطاقة والنظم الكهربية" },

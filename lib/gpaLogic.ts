@@ -14,14 +14,23 @@ export const gradePoints: Record<Grade, number> = {
 // بترجع true لو الطالب يقدر يسجل المادة، و false لو لسه مقفولة
 export function checkCanTake(
   prerequisites: string[], 
-  studentRecords: StudentCourseRecord[]
+  studentRecords: any[], // استخدم الـ Type بتاعك (StudentCourseRecord)
+  completedCredits: number = 0, // ضفنا ده عشان نقارن بيه شرط الساعات
+  requireAny: boolean = false   // ضفنا ده عشان يفعل نظام (أو) للكروت الوهمية
 ): boolean {
   // لو المادة ملهاش متطلبات، افتحها فوراً
   if (!prerequisites || prerequisites.length === 0) return true;
 
-  // لازم يتأكد إن كل المتطلبات (سواء مادة أو مادتين) اتحققت
-  return prerequisites.every(prereqCode => {
-    // نجيب كل محاولات الطالب في المادة المتطلبة دي
+  // دالة داخلية صغيرة بتفحص متطلب واحد (سواء كان عدد ساعات أو مادة)
+  const checkSinglePrereq = (prereqCode: string) => {
+    // 1. فحص هل المتطلب ده عبارة عن عدد ساعات؟ (بيدور على رقم جوه النص)
+    const creditMatch = prereqCode.match(/Completion of (\d+) credits/i);
+    if (creditMatch) {
+      const requiredCredits = parseInt(creditMatch[1], 10);
+      return completedCredits >= requiredCredits; // بيفتح لو ساعات الطالب مساوية أو أكتر
+    }
+
+    // 2. لو المتطلب عبارة عن مادة عادية، نطبق اللوجيك بتاعك
     const attempts = studentRecords.filter(r => r.courseCode === prereqCode);
     
     // لو مسجلهاش خالص، تبقى لسه مقفولة
@@ -34,7 +43,14 @@ export function checkCanTake(
       attempt.grade !== 'Taken' && 
       attempt.grade !== '-'
     );
-  });
+  };
+
+  // 3. التطبيق النهائي: (أو) للكارت الوهمي، و (و) للمواد الطبيعية
+  if (requireAny) {
+    return prerequisites.some(checkSinglePrereq);
+  } else {
+    return prerequisites.every(checkSinglePrereq);
+  }
 }
 
 // 3. دالة معالجة الإعادة (Retake Logic)

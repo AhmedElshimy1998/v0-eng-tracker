@@ -236,14 +236,38 @@ const level = getStudentLevel(completedCredits);
         <TabsContent value="academic-summary" className="space-y-8 animate-in fade-in-50">
           {officialSemesters.map(semName => {
             const coursesInThisSem = displayCatalog.map(course => {
-              const attempts = allStudentRecords.filter(r => r.courseCode === course.code);
-              const attemptInThisSem = attempts.find(a => a.semester === semName);
-              if (attemptInThisSem) return { course, attempt: attemptInThisSem, isIdeal: false, allAttempts: attempts };
-              if (attempts.length === 0 && course.idealSemester === semName) return { course, attempt: null, isIdeal: true, allAttempts: attempts };
-              return null;
-            }).filter(item => item !== null);
+            const attempts = allStudentRecords.filter(r => r.courseCode === course.code);
+            const attemptInThisSem = attempts.find(a => a.semester === semName);
+            if (attemptInThisSem) return { course, attempt: attemptInThisSem, isIdeal: false, allAttempts: attempts };
+            if (attempts.length === 0 && course.idealSemester === semName) return { course, attempt: null, isIdeal: true, allAttempts: attempts };
+            return null;
+          }).filter(item => {
+            if (!item) return false;
+            const { course, attempt, isIdeal } = item;
 
-            if (coursesInThisSem.length === 0) return null;
+            // 1. التحكم في ظهور الكروت الوهمية (Placeholders)
+            if (isIdeal && course.isPlaceholder) {
+              if (course.exclusiveGroupId) {
+                // لو سجل مادة من نفس جروب المفاضلة، اخفي الكارت المدمج
+                const isGroupTaken = allStudentRecords.some(r => displayCatalog.find(c => c.code === r.courseCode && !c.isPlaceholder)?.exclusiveGroupId === course.exclusiveGroupId);
+                if (isGroupTaken) return false;
+              }
+              if (course.electiveGroupId) {
+                // إخفاء كروت المجموعات بالترتيب بناءً على عدد المواد المسجلة
+                const takenCount = allStudentRecords.filter(r => displayCatalog.find(c => c.code === r.courseCode && !c.isPlaceholder)?.electiveGroupId === course.electiveGroupId).length;
+                const placeholders = displayCatalog.filter(c => c.isPlaceholder && c.electiveGroupId === course.electiveGroupId).sort((a, b) => a.code.localeCompare(b.code));
+                const myIndex = placeholders.findIndex(p => p.code === course.code);
+                if (takenCount > myIndex) return false;
+              }
+            }
+
+            // 2. منع ظهور المواد الحقيقية الاختيارية ككروت فاضية (عشان الكارت الوهمي بيقوم بالدور ده)
+            if (isIdeal && !course.isPlaceholder && (course.exclusiveGroupId || course.electiveGroupId)) {
+              return false;
+            }
+
+            return true;
+          });
 
             const actualSemRecord = semesters.find(s => s.name === semName);
             let semGPAStats = null;
@@ -266,7 +290,7 @@ const level = getStudentLevel(completedCredits);
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {coursesInThisSem.map(({ course, attempt, isIdeal, allAttempts }) => {
-                    const canTake = checkCanTake(course.prerequisites, allStudentRecords);
+                    const canTake = checkCanTake(course.prerequisites, allStudentRecords, completedCredits, course.requireAnyPrereq);
                     const successAttempt = allAttempts.find(a => !['F', 'Fail', 'Taken', '-'].includes(a.grade));
 
                     let cardStyle = "border-muted opacity-40"; 
@@ -488,8 +512,9 @@ const level = getStudentLevel(completedCredits);
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3">
                      <select 
-                      className="w-full h-9 rounded-md border border-input bg-background text-foreground dark:bg-[#09090b] dark:text-slate-50 px-3 text-sm mb-4 outline-none"
+                      className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm mb-4 outline-none"
                       onChange={(e) => {
+                        // ... (نفس كود الحفظ بتاعك كما هو بدون تغيير)
                         const code = e.target.value;
                         const updated = [...semesters];
                         updated[semIndex].courses.push({ 
@@ -503,16 +528,47 @@ const level = getStudentLevel(completedCredits);
                         saveSemestersToCloud(updated); e.target.value = "";
                       }}
                       defaultValue=""
-                     >
+                      >
                       <option value="" disabled>+ تسجيل مادة في هذا الترم</option>
                       {displayCatalog.map(c => {
+                        if (c.isPlaceholder) return null; // لا تظهر الكروت الوهمية في قائمة التسجيل
+
                         const hasPassed = allStudentRecords.some(r => r.courseCode === c.code && !['F', 'Fail', 'Taken'].includes(r.grade));
                         const isAlreadyInSem = sem.courses.some(r => r.courseCode === c.code);
-                        const canTake = checkCanTake(c.prerequisites, allStudentRecords);
+                        let canTake = checkCanTake(c.prerequisites, allStudentRecords, completedCredits, c.requireAnyPrereq);
+                        let disabledReason = !canTake ? '(مغلقة)' : '';
+
+                        // أ. فحص تعارض المفاضلة الفردية
+                        if (c.exclusiveGroupId && !hasPassed && !isAlreadyInSem) {
+                          const isConflictTaken = allStudentRecords.some(r => {
+                            const other = displayCatalog.find(x => x.code === r.courseCode);
+                            return other && !other.isPlaceholder && other.exclusiveGroupId === c.exclusiveGroupId && other.code !== c.code;
+                          });
+                          if (isConflictTaken) {
+                            canTake = false;
+                            disabledReason = '(تعارض مع مادة مسجلة)';
+                          }
+                        }
+
+                        // ب. فحص اكتمال المجموعة الاختيارية
+                        if (c.electiveGroupId && !hasPassed && !isAlreadyInSem) {
+                          const takenCount = allStudentRecords.filter(r => {
+                            const other = displayCatalog.find(x => x.code === r.courseCode);
+                            return other && !other.isPlaceholder && other.electiveGroupId === c.electiveGroupId && other.code !== c.code;
+                          }).length;
+                          // الحد الأقصى للمجموعة هو عدد الكروت الوهمية اللي إنت عملتها في courses.ts
+                          const maxAllowed = displayCatalog.filter(x => x.isPlaceholder && x.electiveGroupId === c.electiveGroupId).length;
+                          
+                          if (takenCount >= maxAllowed) {
+                            canTake = false;
+                            disabledReason = '(تم اكتفاء العدد المطلوب)';
+                          }
+                        }
+
                         if (hasPassed || isAlreadyInSem) return null;
-                        return <option key={c.code} value={c.code} disabled={!canTake}>{c.arabicName} {!canTake ? '(مغلقة)' : ''}</option>
+                        return <option key={c.code} value={c.code} disabled={!canTake}>{c.arabicName} {disabledReason}</option>
                       })}
-                     </select>
+                      </select>
 
                      {sem.courses.map(record => {
                        const c = coursesCatalog.find(x => x.code === record.courseCode);
