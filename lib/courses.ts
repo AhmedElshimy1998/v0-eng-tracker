@@ -39,7 +39,7 @@ export const coursesCatalog: Course[] = [
   { code: "MPE 231", arabicName: "ميكانيكا الموائع", englishName: "Fluid Mechanics", credits: 2, category: "متطلبات تخصص (إجباري)", prerequisites: ["EMP 042"], idealSemester: "Level Two - Term 1", department: "هندسة الميكاترونيات" },
   { code: "EPE 211", arabicName: "الات كهربائيه", englishName: "Electrical Machines", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["EPE 111"], idealSemester: "Level Two - Term 1", department: "هندسة الميكاترونيات" },
   { code: "CCE 211", arabicName: "برمجة حاسب", englishName: "Computer Programming", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: [], idealSemester: "Level Two - Term 1", department: "هندسة الميكاترونيات" },
-  { code: "EMP X43", arabicName: "الفيزيقا الهندسية (3)", englishName: "Engineering Physics 3", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["EMP 042"], idealSemester: "Level Two - Term 2", department: "هندسة الميكاترونيات" },
+
   { code: "MPE 252", arabicName: "نظم ميكاترونيات", englishName: "Mechatronics Systems", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 211"], idealSemester: "Level Two - Term 2", department: "هندسة الميكاترونيات" },
   { code: "PDE 221", arabicName: "تصميم ماكينات", englishName: "Machine Design", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["PDE 111"], idealSemester: "Level Two - Term 2", department: "هندسة الميكاترونيات" },
   { code: "EPE 212", arabicName: "الكترونيات القوي", englishName: "Power Electronics", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["EPE 111"], idealSemester: "Level Two - Term 2", department: "هندسة الميكاترونيات" },
@@ -86,6 +86,22 @@ export const coursesCatalog: Course[] = [
   { code: "CCE 411", arabicName: "رؤية الالة", englishName: "Machine Vision", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["CCE 211"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_3" },
   { code: "EEC 412", arabicName: "تصميم الدوائر المتكامله ذات النطاق الواسع جدا", englishName: "VLSI Design", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["EEC 111"], idealSemester: "Level Four - Term 2", department: "هندسة الميكاترونيات", exclusiveGroupId: "exc_MPE_3" },
   
+  // مجموعه العلوم الاساسيه 
+
+  // --- 1. الكروت الوهمية لمجموعة العلوم الأساسية (3 كروت عشان الطالب يختار 3 مرات) ---
+  { code: "PLACE_EMP_1", arabicName: "مادة علوم أساسية (1)", englishName: "Basic Sciences Elective (1)", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: [], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", isPlaceholder: true, electiveGroupId: "elec_emp_basic" },
+  { code: "PLACE_EMP_2", arabicName: "مادة علوم أساسية (2)", englishName: "Basic Sciences Elective (2)", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: [], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", isPlaceholder: true, electiveGroupId: "elec_emp_basic" },
+  { code: "PLACE_EMP_3", arabicName: "مادة علوم أساسية (3)", englishName: "Basic Sciences Elective (3)", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: [], idealSemester: "Level Two - Term 2", department: "المواد العامة (جامعة/كلية)", isPlaceholder: true, electiveGroupId: "elec_emp_basic" },
+
+  // --- 2. المواد الحقيقية للعلوم الأساسية (7 مواد بعد استبعاد المشطوب عليهم) ---
+  { code: "EMP X11", arabicName: "الطرق العددية للمهندسين", englishName: "Numerical Methods for Engineers", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 012", "HUM 131"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+  { code: "EMP X12", arabicName: "الرياضيات المتقطعة", englishName: "Discrete Mathematics", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 011"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+  { code: "EMP X15", arabicName: "الاحصاء و نظرية الاحتمالات", englishName: "Statistic and Probability theory", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 012"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+  { code: "EMP X16", arabicName: "بحوث العمليات", englishName: "Operation Research", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 011"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+  { code: "EMP X17", arabicName: "التحليل الإحصائى للبيانات", englishName: "Statistical data analysis", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 011"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+  { code: "EMP X43", arabicName: "الفيزيقا الهندسية (3)", englishName: "Engineering Physics (3)", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 042"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+  { code: "EMP X32", arabicName: "النانوتكنولوجي", englishName: "Nanotechnology", credits: 3, category: "متطلبات كلية (اختياري)", prerequisites: ["EMP 031"], idealSemester: "Level Two - Term 1", department: "المواد العامة (جامعة/كلية)", electiveGroupId: "elec_emp_basic" },
+
 
   // مواد طاقه
   { code: "MPE 462", arabicName: "ماده للاختبار", englishName: "test path", credits: 3, category: "متطلبات تخصص (إجباري)", prerequisites: ["MPE 461"], idealSemester: "Level Four - Term 2", department: "هندسة الطاقة والنظم الكهربية" },
