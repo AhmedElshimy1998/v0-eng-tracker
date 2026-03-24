@@ -302,12 +302,16 @@ const level = getStudentLevel(completedCredits);
                         const isLockedCard = !attempt && isIdeal && !canTake;
 
                         // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في النافذة
-                        const prereqDetails = course.prerequisites && course.prerequisites.length > 0 
+                        // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في النافذة
+                        const prereqList = course.prerequisites && course.prerequisites.length > 0 
                           ? course.prerequisites.map(pCode => {
                               const pInfo = coursesCatalog.find(c => c.code === pCode);
-                              return `${pInfo?.arabicName || pCode} (${pCode})`;
-                            }).join(" - ")
-                          : "لا يوجد متطلبات محددة";
+                              return {
+                                name: pInfo?.arabicName || pCode,
+                                code: pCode
+                              };
+                            })
+                          : [];
 
                         // 3. تصميم الكارت نفسه (ثابت لكل الحالات عشان شكل الصفحة ما يتغيرش)
                         const cardElement = (
@@ -352,7 +356,25 @@ const level = getStudentLevel(completedCredits);
                                     
                                     {/* قائمة المواد المطلوبة - بخط بولد وشيك */}
                                     <div className="text-xs font-semibold leading-relaxed text-slate-100 bg-red-500/10 p-2 rounded border border-red-500/10">
-                                      {prereqDetails}
+                                      {/* قائمة المواد المطلوبة - كل مادة في كارت أحمر منفصل */}
+                                          <div className="flex flex-col gap-2 mt-1">
+                                            {prereqList.length > 0 ? (
+                                              prereqList.map((prereq, idx) => (
+                                                <div 
+                                                  key={idx} 
+                                                  className="text-[11px] font-semibold leading-relaxed text-red-100 bg-red-500/10 p-2 rounded border border-red-500/20 flex items-start gap-2"
+                                                >
+                                                  {/* نقطة صغيرة لتمييز القائمة */}
+                                                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1 flex-shrink-0" />
+                                                  <span>{prereq.name} <span className="text-[10px] opacity-60">({prereq.code})</span></span>
+                                                </div>
+                                              ))
+                                            ) : (
+                                              <div className="text-xs text-muted-foreground p-2 italic text-center">
+                                                لا يوجد متطلبات محددة
+                                              </div>
+                                            )}
+                                          </div>
                                     </div>
                                   </div>
 
