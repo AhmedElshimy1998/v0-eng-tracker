@@ -355,9 +355,9 @@ const level = getStudentLevel(completedCredits);
                                     </div>
                                     
                                     {/* قائمة المواد المطلوبة - بخط بولد وشيك */}
-                                    <div className="text-xs font-semibold leading-relaxed text-slate-100 bg-red-500/10 p-2 rounded border border-red-500/10">
+                                    
                                       {/* قائمة المواد المطلوبة - كل مادة في كارت أحمر منفصل */}
-                                          
+                                          <div className="flex flex-col gap-2 mt-1">
                                             {prereqList.length > 0 ? (
                                               prereqList.map((prereq, idx) => (
                                                 <div 
@@ -374,8 +374,8 @@ const level = getStudentLevel(completedCredits);
                                                 لا يوجد متطلبات محددة
                                               </div>
                                             )}
-                                          
-                                    </div>
+                                          </div>
+                                    
                                   </div>
 
                                   {/* سهم صغير ليعطي شكل الـ Tooltip الاحترافي */}
