@@ -2,7 +2,7 @@ import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  disable: process.env.NODE_ENV === "development", // تعطيل في بيئة التطوير
+  disable: process.env.NODE_ENV === "development", 
 });
 
 /** @type {import('next').NextConfig} */
@@ -13,7 +13,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // الإضافة الجديدة لحل مشكلة محرك البناء Turbopack
+  turbopack: {},
 };
 
-// تصدير الإعدادات مغلفة بـ PWA
 export default withPWA(nextConfig);
