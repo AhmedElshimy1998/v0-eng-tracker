@@ -7,12 +7,16 @@ import { auth } from "@clerk/nextjs/server" // إضافة مكتبة Clerk
 // دالة لجلب البيانات من السحابة الخاصة بالمستخدم فقط
 export async function getCloudData() {
   try {
-    const { userId } = await auth(); // جلب كود المستخدم
-    if (!userId) return null; // لو مش مسجل دخول، متجيبش حاجة
+    const { userId } = await auth(); 
+    if (!userId) return null; 
 
     // جلب بيانات هذا المستخدم تحديداً
     const data = await kv.get<Subject[]>(`studyhub-cloud-data-${userId}`)
-    return data || []
+    
+    // التعديل هنا: شلنا || [] عشان نرجع البيانات زي ما هي
+    // لو مستخدم جديد هترجع null
+    // لو مستخدم مسح مواده هترجع [] (لأن دالة الحفظ بتسجل المصفوفة الفاضية عادي)
+    return data; 
   } catch (error) {
     console.error("Failed to fetch from cloud:", error)
     return null
