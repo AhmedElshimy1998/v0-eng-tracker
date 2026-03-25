@@ -1,6 +1,8 @@
-const withPWA = require('@ducanh2912/next-pwa').default({
-  dest: 'public',
-  disable: process.env.NODE_ENV === 'development', // عشان ميزعجكش وإنت بتبرمج
+import withPWAInit from "@ducanh2912/next-pwa";
+
+const withPWA = withPWAInit({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development", // تعطيل في بيئة التطوير
 });
 
 /** @type {import('next').NextConfig} */
@@ -11,7 +13,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+};
 
-export default nextConfig
-module.exports = withPWA(nextConfig);
+// تصدير الإعدادات مغلفة بـ PWA
+export default withPWA(nextConfig);
