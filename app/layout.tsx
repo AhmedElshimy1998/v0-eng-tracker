@@ -10,6 +10,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 export const metadata: Metadata = {
   title: 'Engineering Tracker - Academic Progress Tracker',
   description: 'Track your courses, lectures, and academic progress',
+  manifest: '/manifest.json', // السطر ده هو اللي بيربط التطبيق
   generator: 'v0.app',
   icons: {
     icon: [
