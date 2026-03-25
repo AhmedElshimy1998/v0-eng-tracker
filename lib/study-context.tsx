@@ -43,10 +43,12 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       setIsLoading(true)
       const cloudSubjects = await getCloudData()
       
-      if (cloudSubjects && cloudSubjects.length > 0) {
+      // التعديل هنا: نتحقق إن البيانات موجودة فعلاً (حتى لو مصفوفة فارغة)
+      // لو البيانات null أو undefined، ده معناه يوزر جديد تماماً
+      if (cloudSubjects !== null && cloudSubjects !== undefined && Array.isArray(cloudSubjects)) {
         setSubjects(cloudSubjects)
       } else {
-        // لو مفيش بيانات سحابية، نعرض البيانات الافتراضية
+        // لو مفيش بيانات سحابية خالص، نعرض البيانات الافتراضية لأول مرة
         setSubjects(mockSubjects)
       }
       setIsInitialized(true)
