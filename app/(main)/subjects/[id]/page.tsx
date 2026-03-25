@@ -1,6 +1,6 @@
 "use client"
 
-import { use } from "react"
+import { use, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useStudy } from "@/lib/study-context"
 import { LectureItem } from "@/components/lecture-item"
@@ -31,10 +31,21 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
   const { id } = use(params)
   const router = useRouter()
   const { subjects, deleteSubject, getSubjectProgress, reorderLectures } = useStudy()
-
+  
+  const [isDeleting, setIsDeleting] = useState(false)
   const subject = subjects.find((s) => s.id === id)
 
   if (!subject) {
+
+    if (isDeleting) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24">
+          <p className="text-muted-foreground animate-pulse text-lg font-medium">
+            جاري حذف المادة والعودة...
+          </p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center justify-center py-24">
         <h1 className="text-2xl font-bold">Subject not found</h1>
@@ -58,8 +69,9 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
   }
 
   const handleDelete = () => {
-    deleteSubject(subject.id)
-    router.push("/subjects")
+    setIsDeleting(true) // نفعل حالة الحذف أولاً
+    deleteSubject(subject!.id) // مسح المادة
+    router.push("/subjects") // التوجيه للصفحة الرئيسية
   }
 
   const handleMoveUp = (index: number) => {
