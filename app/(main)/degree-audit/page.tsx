@@ -13,6 +13,7 @@ export default function DegreeAudit() {
   const [stats, setStats] = useState({ total: 0, percent: 0 });
   const [departmentName, setDepartmentName] = useState("جاري التحميل...");
   const [loading, setLoading] = useState(true);
+  const [passedCourseCodes, setPassedCourseCodes] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -42,6 +43,14 @@ export default function DegreeAudit() {
           return sum + (course?.credits || 0);
         }, 0);
       
+      // --- ( الإضافة الجديدة هنا ) ---
+      // نستخرج أكواد المواد اللي الطالب نجح فيها فعلياً
+      const passedCodes = effective
+        .filter((r: any) => !["F", "Fail", "Taken", "-"].includes(r.grade?.trim()))
+        .map((r: any) => r.courseCode);
+      setPassedCourseCodes(passedCodes);
+      // -------------------------------
+
       // 2. تحديث الإحصائيات بالساعات اللي عديت فيها فعلياً
       setStats({ 
         total: completedCredits, 
@@ -131,8 +140,49 @@ export default function DegreeAudit() {
             .filter(course => {
               const cDept = course.department?.trim();
               const sDept = departmentName?.trim();
-              // المنطق الجديد: يطابق قسم الطالب أو قسم المواد العامة المسمى حديثاً
-              return cDept === sDept || cDept === "المواد العامة (جامعة/كلية)" || cDept === "General";
+              const isRightDept = cDept === sDept || cDept === "المواد العامة (جامعة/كلية)" || cDept === "General";
+              
+              if (!isRightDept) return false;
+
+              const isPassed = passedCourseCodes.includes(course.code);
+
+              // 1. لو دي مادة حقيقية بس تبع جروب (اختياري أو مفاضلة)
+              if (!course.isPlaceholder && (course.exclusiveGroupId || course.electiveGroupId)) {
+                  // اظهرها "فقط" لو الطالب نجح فيها (عشان متعملش زحمة في الخريطة)
+                  return isPassed;
+              }
+
+              // 2. لو ده كارت وهمي (Placeholder) زي "مادة علوم أساسية"
+              if (course.isPlaceholder) {
+                  // أ. نظام المفاضلة الفردية (زي الإسعافات والقانون)
+                  if (course.exclusiveGroupId) {
+                      // لو الطالب نجح في أي مادة من الجروب ده، اخفي الكارت الوهمي
+                      const hasPassedGroup = coursesCatalog.some(c =>
+                          c.exclusiveGroupId === course.exclusiveGroupId && !c.isPlaceholder && passedCourseCodes.includes(c.code)
+                      );
+                      return !hasPassedGroup; 
+                  }
+                  
+                  // ب. نظام المجموعات (زي 3 من 10)
+                  if (course.electiveGroupId) {
+                      // نحسب الطالب نجح في كام مادة من الجروب ده
+                      const passedInGroupCount = coursesCatalog.filter(c =>
+                          c.electiveGroupId === course.electiveGroupId && !c.isPlaceholder && passedCourseCodes.includes(c.code)
+                      ).length;
+
+                      // نحدد ترتيب الكارت الوهمي ده وسط اخواته
+                      const placeholders = coursesCatalog
+                          .filter(c => c.isPlaceholder && c.electiveGroupId === course.electiveGroupId)
+                          .sort((a, b) => a.code.localeCompare(b.code));
+                      const myIndex = placeholders.findIndex(p => p.code === course.code);
+
+                      // لو عدد المواد اللي نجح فيها >= ترتيبي ككارت وهمي، يبقى دوري انتهى وأختفي
+                      return passedInGroupCount <= myIndex;
+                  }
+              }
+
+              // 3. لو مادة إجبارية عادية (لا وهمية ولا اختياري)، اظهرها دايماً
+              return true;
             })
             .map(course => (
               <div key={course.code} className="flex items-center justify-between p-3 border rounded-lg bg-card/50">
