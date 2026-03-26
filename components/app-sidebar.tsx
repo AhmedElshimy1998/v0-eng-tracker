@@ -84,6 +84,7 @@ export function AppSidebar() {
                 <Link
                   key={item.name}
                   href={item.href}
+                  prefetch={item.prefetch} /* <--- السطر السحري هنا */
                   onClick={() => setIsMobileOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
