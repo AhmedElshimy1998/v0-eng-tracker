@@ -1,20 +1,37 @@
-import { create } from 'zustand' // لو مش عندك zustand ممكن نستخدم State عادية في الـ Context
+"use client"
 
-// ده مخزن بسيط عشان الكروت تعرف بعضها
-interface PromptStore {
+import React, { createContext, useContext, useState, useCallback } from 'react'
+
+interface PromptContextType {
   activePrompts: string[]
   register: (id: string) => void
   unregister: (id: string) => void
 }
 
-import { create as createStore } from 'zustand'
+const PromptContext = createContext<PromptContextType | undefined>(undefined)
 
-export const usePromptManager = createStore<PromptStore>((set) => ({
-  activePrompts: [],
-  register: (id) => set((state) => ({ 
-    activePrompts: state.activePrompts.includes(id) ? state.activePrompts : [...state.activePrompts, id] 
-  })),
-  unregister: (id) => set((state) => ({ 
-    activePrompts: state.activePrompts.filter(p => p !== id) 
-  })),
-}))
+export function PromptProvider({ children }: { children: React.ReactNode }) {
+  const [activePrompts, setActivePrompts] = useState<string[]>([])
+
+  const register = useCallback((id: string) => {
+    setActivePrompts((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }, [])
+
+  const unregister = useCallback((id: string) => {
+    setActivePrompts((prev) => prev.filter((p) => p !== id))
+  }, [])
+
+  return (
+    <PromptContext.Provider value={{ activePrompts, register, unregister }}>
+      {children}
+    </PromptContext.Provider>
+  )
+}
+
+export function usePromptManager() {
+  const context = useContext(PromptContext)
+  if (context === undefined) {
+    throw new Error('usePromptManager must be used within a PromptProvider')
+  }
+  return context
+}

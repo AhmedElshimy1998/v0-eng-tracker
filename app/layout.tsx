@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { StudyProvider } from '@/lib/study-context'
+import { PromptProvider } from "@/hooks/use-floating-prompts"
 import { InstallPWA } from "@/components/InstallPWA"
 import { NotificationPrompt } from "@/components/NotificationPrompt"
 import './globals.css'
@@ -49,11 +50,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <PromptProvider>
           <StudyProvider>
             {children}
             <InstallPWA />
             <NotificationPrompt />
           </StudyProvider>
+          </PromptProvider>
         </ThemeProvider>
         <Analytics />
       </body>
