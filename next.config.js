@@ -11,21 +11,16 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   // === إضافة الجزء الخاص بتكييش الصفحات الديناميكية أوفلاين ===
-  workboxOptions: {
+        workboxOptions: {
     runtimeCaching: [
       {
-        // أي رابط يبدأ بـ view هيفتح من الكاش فوراً (حتى لو الـ ID جديد)
-        urlPattern: /\/subjects\/view.*/i,
-        handler: 'CacheFirst', // جرب CacheFirst هنا عشان نضمن الأوفلاين
+        // تكييش الهيكل الثابت لصفحة العرض
+        urlPattern: /\/subjects\/view$/i, 
+        handler: 'CacheFirst', 
         options: {
-          cacheName: 'subjects-view-shell',
-          expiration: {
-            maxEntries: 1, // إحنا محتاجين "هيكل" الصفحة بس
-            maxAgeSeconds: 30 * 24 * 60 * 60,
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
+          cacheName: 'static-subject-shell',
+          expiration: { maxEntries: 1 },
+          cacheableResponse: { statuses: [0, 200] }
         },
       },
     ],

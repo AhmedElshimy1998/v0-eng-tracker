@@ -1,7 +1,7 @@
 "use client"
 export const dynamic = 'force-static'
-import { useState, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useStudy } from "@/lib/study-context"
 import { LectureItem } from "@/components/lecture-item"
 import { AddLectureDialog } from "@/components/add-lecture-dialog"
@@ -26,12 +26,23 @@ import { ArrowLeft, Trash2, BookOpen, CheckCircle2, Clock, XCircle, Loader2 } fr
 // 1. فصلنا المحتوى في Component داخلي عشان نقدر نستخدم useSearchParams بأمان
 function SubjectDetailContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const id = searchParams.get("id") // سحبنا الـ ID من الرابط: ?id=...
-  
+  const [id, setId] = useState<string | null>(null) // State لتخزين الـ ID
   const { subjects, deleteSubject, getSubjectProgress, reorderLectures, isLoading } = useStudy()
   
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // قراءة الـ ID من الـ Hash عند التحميل أو التغيير
+  useEffect(() => {
+    const getHashId = () => {
+      const hash = window.location.hash.replace('#', '')
+      if (hash) setId(hash)
+    }
+
+    getHashId() // قراءة عند أول دخول
+    window.addEventListener('hashchange', getHashId) // مراقبة لو اللينك اتغير وإنت جوه
+    return () => window.removeEventListener('hashchange', getHashId)
+  }, [])
+
   const subject = subjects.find((s) => s.id === id)
 
   if (isLoading) {
@@ -224,14 +235,5 @@ function SubjectDetailContent() {
 
 // 2. المكون الأساسي اللي هيتم تصديره وتغليفه بـ Suspense
 export default function SubjectDetailPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل بيانات المادة...</p>
-      </div>
-    }>
-      <SubjectDetailContent />
-    </Suspense>
-  )
+  return <SubjectDetailContent />
 }
