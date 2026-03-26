@@ -37,27 +37,52 @@ export async function getAcademicProfile() {
 
 export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
   try {
-    const { userId } = await auth();
+    const { userId } = await auth(); // التحقق من هوية المستخدم عبر Clerk
     if (!userId) return { success: false, error: "Unauthorized" };
     
     const key = `academic-profile-${userId}`;
-    const existingData = (await kv.get<AcademicProfile>(key)) || { name: "", phone: "", department: "", semesters: [] };
+    const existingData = (await kv.get<AcademicProfile>(key)) || { name: "", phone: "", department: "", semesters: [], lastUpdated: 0 };
     
-    // المزامنة الذكية: لو السيرفر أحدث من البيانات المرفوعة، نرفض الـ Overwrite
-    if (data.lastUpdated && existingData.lastUpdated && data.lastUpdated < existingData.lastUpdated) {
-       console.log("Server has newer academic data. Skipping overwrite.");
-       return { success: true, note: "Ignored: Server is newer" }; 
+    // 1. منطق دمج الفصول الدراسية (Semesters Merge)
+    let mergedSemesters = [...existingData.semesters];
+
+    if (data.semesters) {
+      data.semesters.forEach((newSem) => {
+        const existingSemIndex = mergedSemesters.findIndex(s => s.name === newSem.name);
+        
+        if (existingSemIndex > -1) {
+          // أ. لو الفصل موجود، ندمج المواد اللي جواه (Courses Merge)
+          const existingCourses = mergedSemesters[existingSemIndex].courses;
+          const newCourses = newSem.courses;
+          
+          // دمج المواد بناءً على الـ ID أو الكود لمنع التكرار
+          const mergedCourses = [...existingCourses];
+          newCourses.forEach(nc => {
+            if (!mergedCourses.find(ec => ec.id === nc.id || (ec.courseCode === nc.courseCode && ec.semester === nc.semester))) {
+              mergedCourses.push(nc);
+            }
+          });
+          
+          mergedSemesters[existingSemIndex].courses = mergedCourses;
+        } else {
+          // ب. لو الفصل مش موجود أصلاً، نضيفه بالكامل
+          mergedSemesters.push(newSem);
+        }
+      });
     }
 
+    // 2. تجميع البيانات النهائية
     const newData = { 
         ...existingData, 
         ...data,
-        lastUpdated: Date.now() // تحديث الوقت مع كل عملية حفظ
+        semesters: mergedSemesters, // النسخة المدمجة
+        lastUpdated: Date.now() // تحديث طابع الوقت
     };
     
-    await kv.set(key, newData);
+    await kv.set(key, newData); // حفظ البيانات في Vercel KV
     return { success: true };
   } catch (error) {
+    console.error("Failed to merge & save academic profile:", error);
     return { success: false };
   }
 }

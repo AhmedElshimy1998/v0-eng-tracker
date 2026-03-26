@@ -24,29 +24,30 @@ export default function SemesterTrackerPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // 2. التحميل الذكي (أوفلاين أولاً)
+  // 1. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
     const loadProfile = async () => {
-      // أ. القراءة الفورية
+      // أ. القراءة الفورية من المتصفح
       const localProfileStr = localStorage.getItem("studyhub-academic-profile");
       const localDeptsStr = localStorage.getItem("studyhub-global-departments");
 
-      let localLastUpdated = 0; // عشان نقارن بيه وقت السيرفر
+      let localLastUpdated = 0; 
 
       if (localProfileStr) {
         const localData = JSON.parse(localProfileStr);
         setStudentDept(localData.department || "");
         if (localData.semesters) setSemesters(localData.semesters);
-        localLastUpdated = localData.lastUpdated || 0; // سحبنا وقت آخر تعديل
+        localLastUpdated = localData.lastUpdated || 0; 
         
         if (localDeptsStr) {
            const depts = JSON.parse(localDeptsStr);
-           const deptObj = depts.find((d: DepartmentItem) => d.id === localData.department);
+           const deptObj = depts.find((d: any) => d.id === localData.department);
            if (deptObj) setActualDeptName(deptObj.name);
         }
         setIsLoading(false); 
       }
 
-      // ب. جلب السيرفر بذكاء
+      // ب. جلب بيانات السيرفر بذكاء
       if (navigator.onLine) {
         try {
           const [data, allDepts] = await Promise.all([
@@ -58,7 +59,7 @@ export default function SemesterTrackerPage() {
             const needsSync = localStorage.getItem("academic-needs-sync") === "true";
             const serverLastUpdated = data.lastUpdated || 0;
 
-            // الحماية: مش هنحدث من السيرفر إلا لو داتا السيرفر أحدث فعلياً ومفيش مزامنة معلقة
+            // الحماية: تحديث محلي فقط إذا كان السيرفر أحدث ولا توجد تعديلات محلية معلقة
             if (!needsSync && serverLastUpdated >= localLastUpdated) {
               setStudentDept(data.department || "");
               if (data.semesters) setSemesters(data.semesters);
@@ -66,7 +67,7 @@ export default function SemesterTrackerPage() {
             }
             
             if (allDepts) {
-              const deptObject = allDepts.find((d: DepartmentItem) => d.id === (data.department || studentDept));
+              const deptObject = allDepts.find((d: any) => d.id === (data.department || (localProfileStr ? JSON.parse(localProfileStr).department : "")));
               if (deptObject) setActualDeptName(deptObject.name);
               localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
             }
@@ -78,6 +79,45 @@ export default function SemesterTrackerPage() {
       setIsLoading(false);
     };
     loadProfile();
+  }, []);
+
+  // 2. ⭐ الكود الجديد: مراقب المزامنة التلقائية عند عودة الإنترنت
+  useEffect(() => {
+    const handleAcademicOnline = async () => {
+      const needsSync = localStorage.getItem("academic-needs-sync") === "true";
+      
+      if (needsSync && navigator.onLine) {
+        try {
+          const localProfileStr = localStorage.getItem("studyhub-academic-profile");
+          if (localProfileStr) {
+            const localData = JSON.parse(localProfileStr);
+            
+            console.log("🔄 جاري مزامنة المسار الأكاديمي مع السيرفر...");
+            
+            // محاولة حفظ البيانات على السيرفر
+            const result = await saveAcademicProfile({ 
+              semesters: localData.semesters, 
+              lastUpdated: localData.lastUpdated || Date.now() 
+            });
+            
+            if (result.success) {
+              localStorage.setItem("academic-needs-sync", "false");
+              console.log("✅ تمت المزامنة الأكاديمية بنجاح!");
+            }
+          }
+        } catch (e) {
+          console.error("❌ فشلت المزامنة الأكاديمية التلقائية:", e);
+        }
+      }
+    };
+
+    // مراقبة حدث العودة للاتصال
+    window.addEventListener('online', handleAcademicOnline);
+    
+    // تشغيل فحص فوري عند تحميل الصفحة (لو النت شغال وفيه داتا مركونة)
+    handleAcademicOnline(); 
+
+    return () => window.removeEventListener('online', handleAcademicOnline);
   }, []);
 
   // 3. الحفظ الفوري (Optimistic Saving)
