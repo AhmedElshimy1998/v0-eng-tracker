@@ -37,12 +37,17 @@ export async function getAcademicProfile() {
 
 export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
   try {
-    const { userId } = await auth();
+    const { userId } = await auth(); 
     if (!userId) return { success: false, error: "Unauthorized" };
     
     const key = `academic-profile-${userId}`;
-    const existingData = (await kv.get<AcademicProfile>(key)) || { name: "", phone: "", department: "", semesters: [], lastUpdated: 0 };
+    const existingData = (await kv.get<AcademicProfile>(key)) || { semesters: [], lastUpdated: 0 };
     
+    // المزامنة الذكية: لو السيرفر أحدث فعلياً، ارفض التعديل (عشان متمسحش داتا جديدة من جهاز تاني)
+    if (data.lastUpdated && existingData.lastUpdated && data.lastUpdated < existingData.lastUpdated) {
+       return { success: true, note: "Ignored: Server is newer" }; 
+    }
+
     let mergedSemesters = [...existingData.semesters];
 
     if (data.semesters) {
@@ -50,25 +55,10 @@ export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
         const existingSemIndex = mergedSemesters.findIndex(s => s.name === newSem.name);
         
         if (existingSemIndex > -1) {
-          // دمج المواد داخل الفصل الموجود
-          const existingCourses = [...mergedSemesters[existingSemIndex].courses];
-          const newCourses = newSem.courses;
-          
-          newCourses.forEach(nc => {
-            const courseIndex = existingCourses.findIndex(ec => ec.id === nc.id);
-            
-            if (courseIndex > -1) {
-              // ⭐ التعديل الجوهري: تحديث المادة الموجودة بالدرجة الجديدة
-              existingCourses[courseIndex] = { ...existingCourses[courseIndex], ...nc };
-            } else {
-              // إضافة مادة جديدة تماماً
-              existingCourses.push(nc);
-            }
-          });
-          
-          mergedSemesters[existingSemIndex].courses = existingCourses;
+          // ⭐ هنا السر: طالما نسخة المستخدم أحدث، نعتمد قائمة مواده بالكامل لهذا الترم
+          // ده بيسمح بالحذف (لو شال مادة) والتعديل (لو غير درجة)
+          mergedSemesters[existingSemIndex].courses = newSem.courses;
         } else {
-          // إضافة فصل دراسي جديد بالكامل
           mergedSemesters.push(newSem);
         }
       });
@@ -78,13 +68,12 @@ export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
         ...existingData, 
         ...data,
         semesters: mergedSemesters,
-        lastUpdated: Date.now() 
+        lastUpdated: Date.now() // تحديث الـ Timestamp الرسمي على السيرفر
     };
     
     await kv.set(key, newData);
     return { success: true };
   } catch (error) {
-    console.error("Failed to merge & save academic profile:", error);
     return { success: false };
   }
 }
