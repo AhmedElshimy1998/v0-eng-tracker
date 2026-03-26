@@ -14,14 +14,17 @@ const withPWA = withPWAInit({
   workboxOptions: {
     runtimeCaching: [
       {
-        // القاعدة اللي بتخلي صفحة العرض تفتح دايماً أوفلاين
+        // أي رابط يبدأ بـ view هيفتح من الكاش فوراً (حتى لو الـ ID جديد)
         urlPattern: /\/subjects\/view.*/i,
-        handler: 'StaleWhileRevalidate',
+        handler: 'CacheFirst', // جرب CacheFirst هنا عشان نضمن الأوفلاين
         options: {
-          cacheName: 'subjects-view-cache',
+          cacheName: 'subjects-view-shell',
           expiration: {
-            maxEntries: 20,
-            maxAgeSeconds: 30 * 24 * 60 * 60, // شهر
+            maxEntries: 1, // إحنا محتاجين "هيكل" الصفحة بس
+            maxAgeSeconds: 30 * 24 * 60 * 60,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
           },
         },
       },

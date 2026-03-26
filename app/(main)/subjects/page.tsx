@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = 'force-static'
 import { useStudy } from "@/lib/study-context"
 import { SubjectCard } from "@/components/subject-card"
 import { AddSubjectDialog } from "@/components/add-subject-dialog"
