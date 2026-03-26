@@ -37,13 +37,12 @@ export async function getAcademicProfile() {
 
 export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
   try {
-    const { userId } = await auth(); // التحقق من هوية المستخدم عبر Clerk
+    const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
     
     const key = `academic-profile-${userId}`;
     const existingData = (await kv.get<AcademicProfile>(key)) || { name: "", phone: "", department: "", semesters: [], lastUpdated: 0 };
     
-    // 1. منطق دمج الفصول الدراسية (Semesters Merge)
     let mergedSemesters = [...existingData.semesters];
 
     if (data.semesters) {
@@ -51,35 +50,38 @@ export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
         const existingSemIndex = mergedSemesters.findIndex(s => s.name === newSem.name);
         
         if (existingSemIndex > -1) {
-          // أ. لو الفصل موجود، ندمج المواد اللي جواه (Courses Merge)
-          const existingCourses = mergedSemesters[existingSemIndex].courses;
+          // دمج المواد داخل الفصل الموجود
+          const existingCourses = [...mergedSemesters[existingSemIndex].courses];
           const newCourses = newSem.courses;
           
-          // دمج المواد بناءً على الـ ID أو الكود لمنع التكرار
-          const mergedCourses = [...existingCourses];
           newCourses.forEach(nc => {
-            if (!mergedCourses.find(ec => ec.id === nc.id || (ec.courseCode === nc.courseCode && ec.semester === nc.semester))) {
-              mergedCourses.push(nc);
+            const courseIndex = existingCourses.findIndex(ec => ec.id === nc.id);
+            
+            if (courseIndex > -1) {
+              // ⭐ التعديل الجوهري: تحديث المادة الموجودة بالدرجة الجديدة
+              existingCourses[courseIndex] = { ...existingCourses[courseIndex], ...nc };
+            } else {
+              // إضافة مادة جديدة تماماً
+              existingCourses.push(nc);
             }
           });
           
-          mergedSemesters[existingSemIndex].courses = mergedCourses;
+          mergedSemesters[existingSemIndex].courses = existingCourses;
         } else {
-          // ب. لو الفصل مش موجود أصلاً، نضيفه بالكامل
+          // إضافة فصل دراسي جديد بالكامل
           mergedSemesters.push(newSem);
         }
       });
     }
 
-    // 2. تجميع البيانات النهائية
     const newData = { 
         ...existingData, 
         ...data,
-        semesters: mergedSemesters, // النسخة المدمجة
-        lastUpdated: Date.now() // تحديث طابع الوقت
+        semesters: mergedSemesters,
+        lastUpdated: Date.now() 
     };
     
-    await kv.set(key, newData); // حفظ البيانات في Vercel KV
+    await kv.set(key, newData);
     return { success: true };
   } catch (error) {
     console.error("Failed to merge & save academic profile:", error);
