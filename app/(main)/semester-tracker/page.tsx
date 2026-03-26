@@ -153,9 +153,9 @@ export default function SemesterTrackerPage() {
     return coursesCatalog.filter(c => 
       c.department === "General" || 
       c.department === "المواد العامة (جامعة/كلية)" || 
-      c.department === actualDeptName
+      c.department === studentDept // التطابق المباشر 100% مع قسم الطالب
     );
-  }, [actualDeptName]);
+  }, [studentDept]); // التحديث بيحصل بناءً على قسم الطالب من الداتا بيز
 
   const officialSemesters = [
     "Level Zero - Term 1", "Level Zero - Term 2", "Level Zero - Summer",
