@@ -1,5 +1,5 @@
 "use server"
-export const maxDuration = 60;
+
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAcademicProfile } from "./academicActions"; // المصدر الوحيد للداتا

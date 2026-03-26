@@ -5,6 +5,8 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { StudyProvider } from '@/lib/study-context'
 import './globals.css'
 
+export const maxDuration = 60;
+
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
 export const metadata: Metadata = {
