@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, NextRequest } from "next/server";
-
+// s
 // 1. حدد المسارات اللي "أي حد" يشوفها
 const isPublicRoute = createRouteMatcher([
   '/', 
