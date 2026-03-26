@@ -41,55 +41,69 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   // 1. جلب البيانات (أوفلاين أولاً ثم السحابة)
   useEffect(() => {
     async function loadData() {
-      const localDataStr = localStorage.getItem("studyhub-local-data")
-      if (localDataStr) {
-        setSubjects(JSON.parse(localDataStr))
-        setIsLoading(false)
-      }
+  const localDataStr = localStorage.getItem("studyhub-local-data")
+  const localSubjects: Subject[] = localDataStr ? JSON.parse(localDataStr) : []
+  
+  // 1. لو فيه داتا محلي، اعرضها فوراً
+  if (localDataStr) {
+    setSubjects(localSubjects)
+    setIsLoading(false)
+  }
 
-      if (navigator.onLine) {
-        try {
-          const cloudSubjects = await getCloudData()
-          // التريكة هنا: هل في داتا محلية لسه بتترفع؟
-          const needsSync = localStorage.getItem("needs-sync") === "true"
-          
-          // متسمحش للسيرفر يمسح الداتا لو إنت لسه معدل حاجة ومفيش مزامنة معلقة
-          if (!needsSync && cloudSubjects !== null && cloudSubjects !== undefined && Array.isArray(cloudSubjects)) {
-            setSubjects(cloudSubjects)
-            localStorage.setItem("studyhub-local-data", JSON.stringify(cloudSubjects))
-          } else if (!localDataStr) {
-            setSubjects(mockSubjects)
-            localStorage.setItem("studyhub-local-data", JSON.stringify(mockSubjects))
-          }
-        } catch (error) {
-          console.log("Offline or cloud fetch failed, relying on local data.")
-        }
-      } else if (!localDataStr) {
-        setSubjects(mockSubjects)
-      }
+  if (navigator.onLine) {
+    try {
+      const cloudSubjects = await getCloudData() // نكلم السيرفر نجيب أحدث نسخة
       
-      setIsInitialized(true)
-      setIsLoading(false)
+      if (cloudSubjects && Array.isArray(cloudSubjects)) {
+        // 2. الدمج الذكي (الموبايل والكمبيوتر)
+        setSubjects((prevLocal) => {
+          const fromCloudOnly = cloudSubjects.filter(c => !prevLocal.find(l => l.id === c.id))
+          const updatedLocal = prevLocal.map(local => {
+            const cloudVersion = cloudSubjects.find(c => c.id === local.id)
+            return cloudVersion ? cloudVersion : local
+          })
+          const finalMerged = [...updatedLocal, ...fromCloudOnly]
+          localStorage.setItem("studyhub-local-data", JSON.stringify(finalMerged))
+          return finalMerged
+        })
+      } else if (!localDataStr && cloudSubjects === null) {
+        // 3. الحالة الوحيدة لعرض الـ Mock: مفيش محلي "و" السيرفر رد إنه null (مستخدم جديد فعلاً)
+        setSubjects(mockSubjects)
+        localStorage.setItem("studyhub-local-data", JSON.stringify(mockSubjects))
+      }
+    } catch (error) {
+      console.log("Cloud fetch failed.")
     }
+  } else {
+    // 4. لو أوفلاين ومفيش داتا محلي (بسبب مسح الكاش): 
+    // يفضل نعرض شاشة "برجاء الاتصال بالنت لاسترجاع بياناتك" بدل ما نعرض Mock داتا
+    if (!localDataStr) {
+       setIsLoading(false) // عشان ميقفلش في لودينج، بس subjects هتفضل فاضية []
+    }
+  }
+  
+  setIsInitialized(true)
+  setIsLoading(false)
+}
     loadData()
   }, [])
 
   // 2. حفظ أي تعديل جديد فوراً (محلياً ثم سحابياً)
   useEffect(() => {
-    if (isInitialized) {
-      // حفظ محلي فوري
-      localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
-      
-      if (navigator.onLine) {
-        saveCloudData(subjects).catch(() => {
-          // لو النت فصل وقت الحفظ، نضع علامة للمزامنة لاحقاً
-          localStorage.setItem("needs-sync", "true")
-        })
-      } else {
+  // مسموح بالحفظ فقط لو تم الانتهاء من التحميل (initialized) والبيانات مش فاضية تماماً 
+  // (أو لو فاضية بس إحنا متأكدين إن المستخدم هو اللي مسحها)
+  if (isInitialized && subjects.length > 0) {
+    localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
+    
+    if (navigator.onLine) {
+      saveCloudData(subjects).catch(() => {
         localStorage.setItem("needs-sync", "true")
-      }
+      })
+    } else {
+      localStorage.setItem("needs-sync", "true")
     }
-  }, [subjects, isInitialized])
+  }
+}, [subjects, isInitialized])
 
   // 3. مراقب عودة الإنترنت لرفع التعديلات المعلقة
   useEffect(() => {
@@ -97,12 +111,21 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       const needsSync = localStorage.getItem("needs-sync")
       if (needsSync === "true") {
         try {
-          const currentLocalData = JSON.parse(localStorage.getItem("studyhub-local-data") || "[]")
-          await saveCloudData(currentLocalData)
-          localStorage.setItem("needs-sync", "false")
-          console.log("Synced successfully after reconnecting!")
+          // جلب أحدث بيانات مدمجة من الذاكرة المحلية
+          const currentLocalDataStr = localStorage.getItem("studyhub-local-data")
+          const currentLocalData = currentLocalDataStr ? JSON.parse(currentLocalDataStr) : []
+          
+          if (currentLocalData.length > 0) {
+            // رفع البيانات للسحابة المرتبطة بـ userId الخاص بـ Clerk
+            const result = await saveCloudData(currentLocalData)
+            
+            if (result.success) {
+              localStorage.setItem("needs-sync", "false")
+              console.log("✅ All devices synced successfully!")
+            }
+          }
         } catch(e) {
-          console.error("Background sync failed, will retry later.")
+          console.error("❌ Background sync failed, will retry on next connection.")
         }
       }
     }
