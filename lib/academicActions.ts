@@ -9,6 +9,7 @@ export interface AcademicProfile {
   phone: string;
   department: string;
   semesters: SemesterData[];
+  lastUpdated?: number; // الطابع الزمني للمزامنة الذكية
 }
 
 export interface DepartmentItem {
@@ -38,9 +39,22 @@ export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
+    
     const key = `academic-profile-${userId}`;
     const existingData = (await kv.get<AcademicProfile>(key)) || { name: "", phone: "", department: "", semesters: [] };
-    const newData = { ...existingData, ...data };
+    
+    // المزامنة الذكية: لو السيرفر أحدث من البيانات المرفوعة، نرفض الـ Overwrite
+    if (data.lastUpdated && existingData.lastUpdated && data.lastUpdated < existingData.lastUpdated) {
+       console.log("Server has newer academic data. Skipping overwrite.");
+       return { success: true, note: "Ignored: Server is newer" }; 
+    }
+
+    const newData = { 
+        ...existingData, 
+        ...data,
+        lastUpdated: Date.now() // تحديث الوقت مع كل عملية حفظ
+    };
+    
     await kv.set(key, newData);
     return { success: true };
   } catch (error) {
@@ -60,46 +74,9 @@ export async function getDepartments(): Promise<DepartmentItem[]> {
 
 export async function saveDepartments(departments: DepartmentItem[]) {
   try {
-    // التأكد من أن الإدمن هو اللي بيعدل (ممكن تضيف فحص للصلاحيات هنا مستقبلاً)
     await kv.set('global-departments', departments);
     return { success: true };
   } catch (error) {
     return { success: false };
   }
 }
-
-
-export async function getStudentRecords() {
-  try {
-    const { userId } = await auth();
-    if (!userId) return [];
-
-    // جلب البيانات من Upstash
-    const records = await kv.get(`student_records:${userId}`);
-    return (records as any[]) || [];
-  } catch (error) {
-    console.error("Upstash KV Error:", error);
-    return [];
-  }
-}
-
-// 2. 
-
-export async function saveStudentRecord(courseCode: string, grade: string) {
-  try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
-
-    const existingRecords: any[] = await getStudentRecords();
-    const updatedRecords = [
-      ...existingRecords.filter(r => r.courseCode !== courseCode),
-      { courseCode, grade, updatedAt: new Date().toISOString() }
-    ];
-
-    await kv.set(`student_records:${userId}`, updatedRecords);
-    return { success: true };
-  } catch (error) {
-    return { success: false };
-  }
-}
-

@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { GraduationCap, Map, BookOpen, Loader2 } from "lucide-react";
+
+// استيراد دوال اللوجيك الموحدة
 import { getAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+import { getEffectiveRecords, isPassed, TOTAL_GRADUATION_CREDITS } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses";
 
 export default function DegreeAudit() {
@@ -16,58 +18,68 @@ export default function DegreeAudit() {
   const [passedCourseCodes, setPassedCourseCodes] = useState<string[]>([]);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [p, allDepts] = await Promise.all([
-          getAcademicProfile(),
-          getDepartments()
-        ]);
+    async function fetchAuditData() {
+      // دالة مساعدة لمعالجة البيانات (عشان منكررش الكود للـ Local والـ Cloud)
+      const processProfileData = (p: any, allDepts: DepartmentItem[]) => {
+        setProfile(p);
+        
+        const studentDeptId = p.department;
+        const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
+        const actualDeptName = deptObject ? deptObject.name : "لم يحدد بعد";
+        setDepartmentName(actualDeptName);
 
-            if (p) {
-      setProfile(p);
+        const semesters = p.semesters || [];
+        const allRecords = semesters.flatMap((s: any) => s.courses);
+        const effective = getEffectiveRecords(allRecords);
+        
+        // استخدام دالة isPassed الموحدة
+        const passedCodes = effective
+          .filter((r: any) => isPassed(r.grade))
+          .map((r: any) => r.courseCode);
+        setPassedCourseCodes(passedCodes);
+
+        const completedCredits = effective
+          .filter((r: any) => isPassed(r.grade))
+          .reduce((sum, r) => {
+            const course = coursesCatalog.find((c) => c.code === r.courseCode);
+            return sum + (course?.credits || 0);
+          }, 0);
+        
+        setStats({ 
+          total: completedCredits, 
+          percent: Math.min((completedCredits / TOTAL_GRADUATION_CREDITS) * 100, 100) 
+        });
+      };
+
+      // 1. القراءة من التخزين المحلي فوراً (للتشغيل الأوفلاين والسريع)
+      const localProfileStr = localStorage.getItem("studyhub-academic-profile");
+      const localDeptsStr = localStorage.getItem("studyhub-global-departments");
       
-      const studentDeptId = p.department;
-      const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
-      const actualDeptName = deptObject ? deptObject.name : "لم يحدد بعد";
-      setDepartmentName(actualDeptName);
-
-      const semesters = p.semesters || [];
-      const allRecords = semesters.flatMap((s: any) => s.courses);
-      const effective = getEffectiveRecords(allRecords);
-      
-      // 1. حساب الساعات "المنجزة بنجاح" فقط (Excluding F, Fail, Taken)
-      const completedCredits = effective
-        .filter((r: any) => !["F", "Fail", "Taken", "-"].includes(r.grade?.trim()))
-        .reduce((sum, r) => {
-          const course = coursesCatalog.find((c) => c.code === r.courseCode);
-          return sum + (course?.credits || 0);
-        }, 0);
-      
-      // --- ( الإضافة الجديدة هنا ) ---
-      // نستخرج أكواد المواد اللي الطالب نجح فيها فعلياً
-      const passedCodes = effective
-        .filter((r: any) => !["F", "Fail", "Taken", "-"].includes(r.grade?.trim()))
-        .map((r: any) => r.courseCode);
-      setPassedCourseCodes(passedCodes);
-      // -------------------------------
-
-      // 2. تحديث الإحصائيات بالساعات اللي عديت فيها فعلياً
-      setStats({ 
-        total: completedCredits, 
-        percent: Math.min((completedCredits / 160) * 100, 100) 
-      });
-
-      // ملاحظة: لو محتاج الـ GPA لسه في الصفحة، تقدر تحسبه كدة:
-      // const { gpa } = calculateGPA(effective, coursesCatalog);
-      // setGpa(gpa);
-    }
-      } catch (error) {
-        console.error("Error fetching audit data:", error);
-      } finally {
-        setLoading(false);
+      if (localProfileStr && localDeptsStr) {
+        processProfileData(JSON.parse(localProfileStr), JSON.parse(localDeptsStr));
+        setLoading(false); // إخفاء التحميل فوراً!
       }
+
+      // 2. جلب أحدث بيانات من السيرفر في الخلفية
+      if (navigator.onLine) {
+        try {
+          const [p, allDepts] = await Promise.all([
+            getAcademicProfile(),
+            getDepartments()
+          ]);
+
+          if (p && allDepts) {
+            localStorage.setItem("studyhub-academic-profile", JSON.stringify(p));
+            localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
+            processProfileData(p, allDepts);
+          }
+        } catch (error) {
+          console.error("Offline mode: using cached audit data.");
+        }
+      }
+      setLoading(false);
     }
-    fetchData();
+    fetchAuditData();
   }, []);
 
   if (loading) {
@@ -77,8 +89,6 @@ export default function DegreeAudit() {
       </div>
     );
   }
-
-  const totalRequired = 160;
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -99,7 +109,7 @@ export default function DegreeAudit() {
                 <div className="text-2xl font-bold">{stats.percent.toFixed(1)}%</div>
              </div>
              <div className="text-sm text-muted-foreground">
-                {stats.total} من {totalRequired} ساعة معتمدة
+                {stats.total} من {TOTAL_GRADUATION_CREDITS} ساعة معتمدة
              </div>
           </div>
           <Progress value={stats.percent} className="h-3" />
@@ -114,7 +124,7 @@ export default function DegreeAudit() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-orange-500">{Math.max(totalRequired - stats.total, 0)} ساعة</div>
+            <div className="text-3xl font-bold text-orange-500">{Math.max(TOTAL_GRADUATION_CREDITS - stats.total, 0)} ساعة</div>
             <p className="text-sm text-muted-foreground mt-1">ساعات دراسية تفصلك عن درجة البكالوريوس.</p>
           </CardContent>
         </Card>
@@ -132,7 +142,6 @@ export default function DegreeAudit() {
         </Card>
       </div>
 
-      {/* عرض المواد المتوافقة مع القسم الجديد والمواد العامة */}
       <div className="space-y-4 pt-4">
         <h3 className="text-xl font-bold text-right">المواد المقررة حسب اللائحة</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -144,44 +153,34 @@ export default function DegreeAudit() {
               
               if (!isRightDept) return false;
 
-              const isPassed = passedCourseCodes.includes(course.code);
+              const passed = passedCourseCodes.includes(course.code);
 
-              // 1. لو دي مادة حقيقية بس تبع جروب (اختياري أو مفاضلة)
               if (!course.isPlaceholder && (course.exclusiveGroupId || course.electiveGroupId)) {
-                  // اظهرها "فقط" لو الطالب نجح فيها (عشان متعملش زحمة في الخريطة)
-                  return isPassed;
+                  return passed;
               }
 
-              // 2. لو ده كارت وهمي (Placeholder) زي "مادة علوم أساسية"
               if (course.isPlaceholder) {
-                  // أ. نظام المفاضلة الفردية (زي الإسعافات والقانون)
                   if (course.exclusiveGroupId) {
-                      // لو الطالب نجح في أي مادة من الجروب ده، اخفي الكارت الوهمي
                       const hasPassedGroup = coursesCatalog.some(c =>
                           c.exclusiveGroupId === course.exclusiveGroupId && !c.isPlaceholder && passedCourseCodes.includes(c.code)
                       );
                       return !hasPassedGroup; 
                   }
                   
-                  // ب. نظام المجموعات (زي 3 من 10)
                   if (course.electiveGroupId) {
-                      // نحسب الطالب نجح في كام مادة من الجروب ده
                       const passedInGroupCount = coursesCatalog.filter(c =>
                           c.electiveGroupId === course.electiveGroupId && !c.isPlaceholder && passedCourseCodes.includes(c.code)
                       ).length;
 
-                      // نحدد ترتيب الكارت الوهمي ده وسط اخواته
                       const placeholders = coursesCatalog
                           .filter(c => c.isPlaceholder && c.electiveGroupId === course.electiveGroupId)
                           .sort((a, b) => a.code.localeCompare(b.code));
                       const myIndex = placeholders.findIndex(p => p.code === course.code);
 
-                      // لو عدد المواد اللي نجح فيها >= ترتيبي ككارت وهمي، يبقى دوري انتهى وأختفي
                       return passedInGroupCount <= myIndex;
                   }
               }
 
-              // 3. لو مادة إجبارية عادية (لا وهمية ولا اختياري)، اظهرها دايماً
               return true;
             })
             .map(course => (

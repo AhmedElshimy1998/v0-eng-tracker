@@ -7,7 +7,7 @@ import { getCloudData, saveCloudData } from "./actions"
 
 interface StudyContextType {
   subjects: Subject[]
-  addSubject: (subject: Omit<Subject, "id" | "lectures" | "exams">) => void
+  addSubject: (subject: Omit<Subject, "id" | "lectures" | "exams" | "schedules">) => void
   updateSubject: (id: string, data: Partial<Subject>) => void
   deleteSubject: (id: string) => void
   addLecture: (subjectId: string, lecture: Omit<Lecture, "id" | "order">) => void
@@ -37,32 +37,76 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // جلب البيانات من السحابة عند فتح الموقع
+  // 1. جلب البيانات (أوفلاين أولاً ثم السحابة)
   useEffect(() => {
     async function loadData() {
-      setIsLoading(true)
-      const cloudSubjects = await getCloudData()
-      
-      // التعديل هنا: نتحقق إن البيانات موجودة فعلاً (حتى لو مصفوفة فارغة)
-      // لو البيانات null أو undefined، ده معناه يوزر جديد تماماً
-      if (cloudSubjects !== null && cloudSubjects !== undefined && Array.isArray(cloudSubjects)) {
-        setSubjects(cloudSubjects)
-      } else {
-        // لو مفيش بيانات سحابية خالص، نعرض البيانات الافتراضية لأول مرة
+      // القراءة من التخزين المحلي فوراً لسرعة العرض
+      const localData = localStorage.getItem("studyhub-local-data")
+      if (localData) {
+        setSubjects(JSON.parse(localData))
+        setIsLoading(false) // إخفاء اللودينج فوراً لو فيه داتا محلية
+      }
+
+      // محاولة المزامنة مع السحابة في الخلفية
+      if (navigator.onLine) {
+        try {
+          const cloudSubjects = await getCloudData()
+          if (cloudSubjects !== null && cloudSubjects !== undefined && Array.isArray(cloudSubjects)) {
+            setSubjects(cloudSubjects)
+            localStorage.setItem("studyhub-local-data", JSON.stringify(cloudSubjects))
+          } else if (!localData) {
+            setSubjects(mockSubjects)
+            localStorage.setItem("studyhub-local-data", JSON.stringify(mockSubjects))
+          }
+        } catch (error) {
+          console.log("Offline or cloud fetch failed, relying on local data.")
+        }
+      } else if (!localData) {
         setSubjects(mockSubjects)
       }
+      
       setIsInitialized(true)
       setIsLoading(false)
     }
     loadData()
   }, [])
 
-  // حفظ أي تعديل جديد فوراً على السحابة
+  // 2. حفظ أي تعديل جديد فوراً (محلياً ثم سحابياً)
   useEffect(() => {
     if (isInitialized) {
-      saveCloudData(subjects)
+      // حفظ محلي فوري
+      localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
+      
+      if (navigator.onLine) {
+        saveCloudData(subjects).catch(() => {
+          // لو النت فصل وقت الحفظ، نضع علامة للمزامنة لاحقاً
+          localStorage.setItem("needs-sync", "true")
+        })
+      } else {
+        localStorage.setItem("needs-sync", "true")
+      }
     }
   }, [subjects, isInitialized])
+
+  // 3. مراقب عودة الإنترنت لرفع التعديلات المعلقة
+  useEffect(() => {
+    const handleOnline = async () => {
+      const needsSync = localStorage.getItem("needs-sync")
+      if (needsSync === "true") {
+        try {
+          const currentLocalData = JSON.parse(localStorage.getItem("studyhub-local-data") || "[]")
+          await saveCloudData(currentLocalData)
+          localStorage.setItem("needs-sync", "false")
+          console.log("Synced successfully after reconnecting!")
+        } catch(e) {
+          console.error("Background sync failed, will retry later.")
+        }
+      }
+    }
+
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [])
 
   const generateId = () => Math.random().toString(36).substring(2, 9)
 

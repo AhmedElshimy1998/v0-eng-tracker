@@ -8,13 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { calculateGPA, checkCanTake, getEffectiveRecords } from "@/lib/gpaLogic";
+// 1. استيراد العقل المدبر الجديد
+import { calculateGPA, checkCanTake, getEffectiveRecords, isPassed, getStudentLevel } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses"; 
 import { SemesterData, Grade } from "@/lib/types";
 import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
@@ -25,29 +23,71 @@ export default function SemesterTrackerPage() {
   const [actualDeptName, setActualDeptName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // 2. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
     const loadProfile = async () => {
-      const [data, allDepts] = await Promise.all([
-        getAcademicProfile(),
-        getDepartments()
-      ]);
-      
-      if (data) {
-        setStudentDept(data.department || "");
-        // نجلب الاسم العربي للقسم للمطابقة في البحث
-        const deptObject = allDepts.find((d: DepartmentItem) => d.id === data.department);
-        if (deptObject) setActualDeptName(deptObject.name);
+      // أ. القراءة الفورية من المتصفح لسرعة العرض
+      const localProfileStr = localStorage.getItem("studyhub-academic-profile");
+      const localDeptsStr = localStorage.getItem("studyhub-global-departments");
+
+      if (localProfileStr) {
+        const localData = JSON.parse(localProfileStr);
+        setStudentDept(localData.department || "");
+        if (localData.semesters) setSemesters(localData.semesters);
         
-        if (data.semesters) setSemesters(data.semesters);
+        if (localDeptsStr) {
+           const depts = JSON.parse(localDeptsStr);
+           const deptObj = depts.find((d: DepartmentItem) => d.id === localData.department);
+           if (deptObj) setActualDeptName(deptObj.name);
+        }
+        setIsLoading(false); // إخفاء التحميل فوراً!
+      }
+
+      // ب. جلب أحدث بيانات من السيرفر في الخلفية لو فيه نت
+      if (navigator.onLine) {
+        try {
+          const [data, allDepts] = await Promise.all([
+            getAcademicProfile(),
+            getDepartments()
+          ]);
+          
+          if (data) {
+            setStudentDept(data.department || "");
+            if (data.semesters) setSemesters(data.semesters);
+            localStorage.setItem("studyhub-academic-profile", JSON.stringify(data));
+            
+            if (allDepts) {
+              const deptObject = allDepts.find((d: DepartmentItem) => d.id === data.department);
+              if (deptObject) setActualDeptName(deptObject.name);
+              localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
+            }
+          }
+        } catch (e) {
+          console.log("Offline mode: using cached academic data.");
+        }
       }
       setIsLoading(false);
     };
     loadProfile();
   }, []);
 
+  // 3. الحفظ الفوري (Optimistic Saving)
   const saveSemestersToCloud = async (updatedSemesters: SemesterData[]) => {
     setSemesters(updatedSemesters); 
-    await saveAcademicProfile({ semesters: updatedSemesters }); 
+    
+    // حفظ محلي فوراً
+    const localProfileStr = localStorage.getItem("studyhub-academic-profile");
+    let profileObj = localProfileStr ? JSON.parse(localProfileStr) : {};
+    profileObj.semesters = updatedSemesters;
+    profileObj.lastUpdated = Date.now(); // إضافة الطابع الزمني
+    localStorage.setItem("studyhub-academic-profile", JSON.stringify(profileObj));
+
+    // مزامنة سحابية لو فيه نت
+    if (navigator.onLine) {
+      await saveAcademicProfile({ semesters: updatedSemesters, lastUpdated: profileObj.lastUpdated }); 
+    } else {
+      localStorage.setItem("academic-needs-sync", "true");
+    }
   };
 
   const displayCatalog = useMemo(() => {
@@ -73,7 +113,7 @@ export default function SemesterTrackerPage() {
 
   const completedCredits = useMemo(() => {
     return effectiveRecords
-      .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade)) // منطق النجاح اللي حددناه
+      .filter(r => isPassed(r.grade)) // استخدام دالة النجاح الموحدة
       .reduce((sum, r) => {
         const course = coursesCatalog.find(c => c.code === r.courseCode);
         return sum + (course?.credits || 0);
@@ -132,19 +172,13 @@ export default function SemesterTrackerPage() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-24 gap-4">
         <Loader2 className="animate-spin h-10 w-10 text-primary" />
-        <p className="text-muted-foreground font-medium text-lg">جاري جلب مسارك الأكاديمي من السحابة...</p>
+        <p className="text-muted-foreground font-medium text-lg">جاري تحميل مسارك الأكاديمي...</p>
       </div>
     );
   }
-const getStudentLevel = (credits: number) => {
-  if (credits < 32) return { label: "Level 0", color: "bg-blue-500/10 text-blue-500" };
-  if (credits < 64) return { label: "Level 1", color: "bg-cyan-500/10 text-cyan-500" };
-  if (credits < 96) return { label: "Level 2", color: "bg-green-500/10 text-green-500" };
-  if (credits < 128) return { label: "Level 3", color: "bg-yellow-500/10 text-yellow-500" };
-  return { label: "Level 4", color: "bg-purple-500/10 text-purple-500" };
-};
 
-const level = getStudentLevel(completedCredits);
+  const level = getStudentLevel(completedCredits); // استخدام الدالة الموحدة
+  
   return (
     <TooltipProvider>
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -176,11 +210,6 @@ const level = getStudentLevel(completedCredits);
   <CardContent>
     <div className="flex justify-between items-center">
       <div className="text-2xl font-bold">{completedCredits}</div>
-    { /*
-      <Badge variant="outline" className="text-[10px] opacity-70 border-muted">
-        {level.label} Status
-      </Badge>
-      */ }
     </div>
     <p className="text-xs text-muted-foreground">ساعة معتمدة بنجاح</p>
   </CardContent>
@@ -245,15 +274,12 @@ const level = getStudentLevel(completedCredits);
             if (!item) return false;
             const { course, attempt, isIdeal } = item;
 
-            // 1. التحكم في ظهور الكروت الوهمية (Placeholders)
             if (isIdeal && course.isPlaceholder) {
               if (course.exclusiveGroupId) {
-                // لو سجل مادة من نفس جروب المفاضلة، اخفي الكارت المدمج
                 const isGroupTaken = allStudentRecords.some(r => displayCatalog.find(c => c.code === r.courseCode && !c.isPlaceholder)?.exclusiveGroupId === course.exclusiveGroupId);
                 if (isGroupTaken) return false;
               }
               if (course.electiveGroupId) {
-                // إخفاء كروت المجموعات بالترتيب بناءً على عدد المواد المسجلة
                 const takenCount = allStudentRecords.filter(r => displayCatalog.find(c => c.code === r.courseCode && !c.isPlaceholder)?.electiveGroupId === course.electiveGroupId).length;
                 const placeholders = displayCatalog.filter(c => c.isPlaceholder && c.electiveGroupId === course.electiveGroupId).sort((a, b) => a.code.localeCompare(b.code));
                 const myIndex = placeholders.findIndex(p => p.code === course.code);
@@ -261,7 +287,6 @@ const level = getStudentLevel(completedCredits);
               }
             }
 
-            // 2. منع ظهور المواد الحقيقية الاختيارية ككروت فاضية (عشان الكارت الوهمي بيقوم بالدور ده)
             if (isIdeal && !course.isPlaceholder && (course.exclusiveGroupId || course.electiveGroupId)) {
               return false;
             }
@@ -291,7 +316,7 @@ const level = getStudentLevel(completedCredits);
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {coursesInThisSem.map(({ course, attempt, isIdeal, allAttempts }) => {
                     const canTake = checkCanTake(course.prerequisites, allStudentRecords, completedCredits, course.requireAnyPrereq);
-                    const successAttempt = allAttempts.find(a => !['F', 'Fail', 'Taken', '-'].includes(a.grade));
+                    const successAttempt = allAttempts.find(a => isPassed(a.grade)); // التعديل هنا
 
                     let cardStyle = "border-muted opacity-40"; 
                     let statusBadge = null;
@@ -321,12 +346,9 @@ const level = getStudentLevel(completedCredits);
                         statusBadge = <Lock className="h-4 w-4 text-muted-foreground" />;
                       }
                     }
-                    // 1. فحص حالة القفل والسبب بدقة
-                    // 1. الشرط الصارم: الكارت مغلق "فقط" لو ملوش أي محاولة سابقة، وهو في الخطة المثالية، والمتطلبات غير مستوفاة
+
                         const isLockedCard = !attempt && isIdeal && !canTake;
 
-                        // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في النافذة
-                        // 2. تجهيز أسماء المتطلبات بالعربي لعرضها في النافذة
                         const prereqList = course.prerequisites && course.prerequisites.length > 0 
                           ? course.prerequisites.map(pCode => {
                               const pInfo = coursesCatalog.find(c => c.code === pCode);
@@ -337,7 +359,6 @@ const level = getStudentLevel(completedCredits);
                             })
                           : [];
 
-                        // 3. تصميم الكارت نفسه (ثابت لكل الحالات عشان شكل الصفحة ما يتغيرش)
                         const cardElement = (
                           <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all h-full ${cardStyle} ${isLockedCard ? 'cursor-help' : ''}`}>
                             <div className="flex justify-between items-start mb-2">
@@ -348,12 +369,9 @@ const level = getStudentLevel(completedCredits);
                           </div>
                         );
 
-                        // 4. الحل النهائي: لو الكارت رمادي (مغلق)، حط النافذة.. لو أي حاجة تانية، رجع الكارت "حاف"
-                        // الحل النهائي: استخدام نظام الـ group-hover اليدوي بدلاً من الـ Tooltip
                         if (isLockedCard) {
                           return (
                             <div key={`${course.code}-locked`} className="relative group cursor-help overflow-visible h-full">
-                              {/* الكارت الأساسي (باهت لأنه مغلق) - نفس ستايلك الأصلي */}
                               <div className={`border p-4 rounded-lg flex flex-col justify-between transition-all h-full ${cardStyle}`}>
                                 <div className="flex justify-between items-start mb-2">
                                   <div className="font-semibold text-sm text-right">{course.arabicName}</div>
@@ -362,25 +380,15 @@ const level = getStudentLevel(completedCredits);
                                 <div className="text-xs text-muted-foreground text-right">{course.code} • {course.credits} ساعة</div>
                               </div>
 
-                              {/* النافذة المنبثقة (تظهر عند الـ Hover أو اللمس) - نسخة طبق الأصل من كارت الإدارة */}
                               <div className="absolute top-full mt-2 right-0 w-64 z-[100] hidden group-hover:block animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="bg-popover text-popover-foreground border shadow-xl rounded-md p-3 text-sm flex flex-col gap-2 border-red-500/50">
-                                  
-                                  {/* عنوان الهوفر - نفس ستايل هيدر الإدارة */}
                                   <h4 className="font-bold border-b pb-1 mb-1 text-xs text-muted-foreground flex items-center justify-end gap-1.5">
                                     <span>متطلبات التسجيل</span>
                                   </h4>
-                                  
-                                  {/* محتوى الهوفر - الحفاظ على النص الكامل للمتطلبات */}
                                   <div className="flex flex-col gap-1.5 text-right mt-1">
-                                    {/* جملة عليك اجتياز المتطلبات التالية: */}
                                     <div className="text-xs text-red-500/80 font-medium italic">
                                       عليك اجتياز المتطلبات التالية:
                                     </div>
-                                    
-                                    {/* قائمة المواد المطلوبة - بخط بولد وشيك */}
-                                    
-                                      {/* قائمة المواد المطلوبة - كل مادة في كارت أحمر منفصل */}
                                           <div className="flex flex-col gap-2 mt-1">
                                             {prereqList.length > 0 ? (
                                               prereqList.map((prereq, idx) => (
@@ -388,7 +396,6 @@ const level = getStudentLevel(completedCredits);
                                                   key={idx} 
                                                   className="text-[11px] font-semibold leading-relaxed text-red-100 bg-red-500/10 p-2 rounded border border-red-500/20 flex items-start gap-2"
                                                 >
-                                                  {/* نقطة صغيرة لتمييز القائمة */}
                                                   <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1 flex-shrink-0" />
                                                   <span>{prereq.name} <span className="text-[10px] opacity-60">({prereq.code})</span></span>
                                                 </div>
@@ -399,12 +406,8 @@ const level = getStudentLevel(completedCredits);
                                               </div>
                                             )}
                                           </div>
-                                    
                                   </div>
-
-                                  {/* سهم صغير ليعطي شكل الـ Tooltip الاحترافي */}
                                   <div className="absolute bottom-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-popover"></div>
-                                  {/* حدود صغيرة للسهم لتتناسب مع حدود الكارد */}
                                   <div className="absolute bottom-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-red-500/50 -mb-[1px]"></div>
                                 </div>
                               </div>
@@ -412,7 +415,6 @@ const level = getStudentLevel(completedCredits);
                           );
                         }
 
-                        // للمواد الذهبية (متاحة)، الخضراء (ناجحة)، والحمراء (رسوب)
                         return (
                           <div key={`${course.code}-${attempt?.id || 'ideal'}`} className="h-full">
                             {cardElement}
@@ -441,23 +443,20 @@ const level = getStudentLevel(completedCredits);
 
           <div className="grid gap-6 lg:grid-cols-2">
             {semesters.map((sem, semIndex) => {
-  // 1. حساب ساعات التسجيل "النهائية" (فقط المواد التي حصلت على تقدير نهائي وليس Taken)
   const finalizedRegistrationCredits = sem.courses
-    .filter(r => r.grade !== 'Taken' && r.grade !== '-') // استبعاد المواد قيد الدراسة
+    .filter(r => r.grade !== 'Taken' && r.grade !== '-') 
     .reduce((sum, r) => {
       const course = coursesCatalog.find(c => c.code === r.courseCode);
       return sum + (course?.credits || 0);
     }, 0);
 
-  // 2. حساب ساعات النجاح الفعلية لهذا الترم
   const passedCreditsInSem = sem.courses
-    .filter(r => !['F', 'Fail', 'Taken', '-'].includes(r.grade)) 
+    .filter(r => isPassed(r.grade)) // التعديل هنا لدالة النجاح الموحدة
     .reduce((sum, r) => {
       const course = coursesCatalog.find(c => c.code === r.courseCode);
       return sum + (course?.credits || 0);
     }, 0);
 
-  // 3. حساب ساعات المواد "قيد الدراسة" حالياً (إضافي للوضوح)
   const currentOngoingCredits = sem.courses
     .filter(r => r.grade === 'Taken')
     .reduce((sum, r) => {
@@ -465,7 +464,6 @@ const level = getStudentLevel(completedCredits);
       return sum + (course?.credits || 0);
     }, 0);
 
-  // نستخدم دالة GPA الأصلية للحسابات الرياضية
   const semStats = calculateGPA(sem.courses, coursesCatalog);
 
   return (
@@ -474,24 +472,18 @@ const level = getStudentLevel(completedCredits);
         <div>
           <CardTitle className="text-md">{sem.name}</CardTitle>
           <CardDescription className="mt-1 flex flex-wrap gap-2 items-center">
-            {/* المعدل الفصلي */}
             <span className="flex items-center gap-1">
               المعدل: <span className={`font-bold ${semStats.gpa >= 2 ? 'text-green-500' : 'text-red-500'}`}>{semStats.gpa.toFixed(2)}</span>
             </span>
             <span className="text-muted-foreground">|</span>
-            
-            {/* تسجيل نهائي (بدون الـ Taken) */}
             <span className="flex items-center gap-1">
               التسجيل النهائي: <span className="font-bold text-blue-400">{finalizedRegistrationCredits}</span>
             </span>
             <span className="text-muted-foreground">|</span>
-            
-            {/* ساعات النجاح */}
             <span className="flex items-center gap-1">
               النجاح: <span className="font-bold text-green-500">{passedCreditsInSem}</span>
             </span>
 
-            {/* إظهار المواد الحالية لو موجودة */}
             {currentOngoingCredits > 0 && (
               <>
                 <span className="text-muted-foreground">|</span>
@@ -514,7 +506,6 @@ const level = getStudentLevel(completedCredits);
                      <select 
                       className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm mb-4 outline-none"
                       onChange={(e) => {
-                        // ... (نفس كود الحفظ بتاعك كما هو بدون تغيير)
                         const code = e.target.value;
                         const updated = [...semesters];
                         updated[semIndex].courses.push({ 
@@ -531,14 +522,13 @@ const level = getStudentLevel(completedCredits);
                       >
                       <option value="" disabled>+ تسجيل مادة في هذا الترم</option>
                       {displayCatalog.map(c => {
-                        if (c.isPlaceholder) return null; // لا تظهر الكروت الوهمية في قائمة التسجيل
+                        if (c.isPlaceholder) return null; 
 
-                        const hasPassed = allStudentRecords.some(r => r.courseCode === c.code && !['F', 'Fail', 'Taken'].includes(r.grade));
+                        const hasPassed = allStudentRecords.some(r => r.courseCode === c.code && isPassed(r.grade)); // التعديل هنا
                         const isAlreadyInSem = sem.courses.some(r => r.courseCode === c.code);
                         let canTake = checkCanTake(c.prerequisites, allStudentRecords, completedCredits, c.requireAnyPrereq);
                         let disabledReason = !canTake ? '(مغلقة)' : '';
 
-                        // أ. فحص تعارض المفاضلة الفردية
                         if (c.exclusiveGroupId && !hasPassed && !isAlreadyInSem) {
                           const isConflictTaken = allStudentRecords.some(r => {
                             const other = displayCatalog.find(x => x.code === r.courseCode);
@@ -550,13 +540,11 @@ const level = getStudentLevel(completedCredits);
                           }
                         }
 
-                        // ب. فحص اكتمال المجموعة الاختيارية
                         if (c.electiveGroupId && !hasPassed && !isAlreadyInSem) {
                           const takenCount = allStudentRecords.filter(r => {
                             const other = displayCatalog.find(x => x.code === r.courseCode);
                             return other && !other.isPlaceholder && other.electiveGroupId === c.electiveGroupId && other.code !== c.code;
                           }).length;
-                          // الحد الأقصى للمجموعة هو عدد الكروت الوهمية اللي إنت عملتها في courses.ts
                           const maxAllowed = displayCatalog.filter(x => x.isPlaceholder && x.electiveGroupId === c.electiveGroupId).length;
                           
                           if (takenCount >= maxAllowed) {
@@ -576,7 +564,6 @@ const level = getStudentLevel(completedCredits);
                          <div key={record.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/50 transition-colors">
                            <div className="flex-1 truncate">
                              <div className="text-sm font-medium truncate">{c?.arabicName || record.courseCode}</div>
-                             {/* تم إرجاع كود المادة هنا */}
                              <div className="text-xs text-muted-foreground">{c?.code}</div>
                            </div>
                            <select 
@@ -593,7 +580,6 @@ const level = getStudentLevel(completedCredits);
                        )
                      })}
 
-                     {/* تم إرجاع رسالة الترم الفارغ هنا */}
                      {sem.courses.length === 0 && (
                        <div className="text-center text-xs text-muted-foreground pt-2">
                          لم تقم بتسجيل مواد في هذا الترم بعد.
@@ -604,7 +590,6 @@ const level = getStudentLevel(completedCredits);
               )
             })}
             
-            {/* تم إرجاع رسالة عدم وجود فصول نهائياً هنا */}
             {semesters.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground border rounded-lg border-dashed">
                 لم تقم بإضافة أي فصول دراسية بعد. ابدأ بإضافة فصل دراسي للتخطيط.
