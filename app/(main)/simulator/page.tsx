@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Calculator, Loader2 } from "lucide-react";
 import { getAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+
+// تم تصحيح المسار هنا لـ academic-logic
+import { calculateGPA, getEffectiveRecords } from "@/lib/academic-logic"; 
 import { coursesCatalog } from "@/lib/courses";
 
 export default function GPASimulator() {
@@ -17,28 +19,53 @@ export default function GPASimulator() {
 
   useEffect(() => {
     async function loadInitialData() {
-      try {
-        const [profile, allDepts] = await Promise.all([
-          getAcademicProfile(),
-          getDepartments()
-        ]);
+      // 1. القراءة من المتصفح أولاً (أوفلاين)
+      const localProfileStr = localStorage.getItem("studyhub-academic-profile");
+      const localDeptsStr = localStorage.getItem("studyhub-global-departments");
 
-        if (profile) {
-          // جلب اسم القسم العربي للمطابقة
-          const studentDeptId = profile.department;
-          const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
-          setDepartmentName(deptObject ? deptObject.name : "");
-
-          const allRecords = (profile.semesters || []).flatMap((s: any) => s.courses);
-          const effective = getEffectiveRecords(allRecords);
-          const { gpa, totalCredits } = calculateGPA(effective, coursesCatalog);
-          setCurrentStats({ gpa, credits: totalCredits });
+      if (localProfileStr) {
+        const profile = JSON.parse(localProfileStr);
+        const studentDeptId = profile.department;
+        
+        if (localDeptsStr) {
+           const allDepts = JSON.parse(localDeptsStr);
+           const deptObject = allDepts.find((d: DepartmentItem) => d.id === studentDeptId);
+           setDepartmentName(deptObject ? deptObject.name : "");
         }
-      } catch (error) {
-        console.error("Error loading simulator data:", error);
-      } finally {
-        setLoading(false);
+
+        const allRecords = (profile.semesters || []).flatMap((s: any) => s.courses);
+        const effective = getEffectiveRecords(allRecords);
+        const { gpa, totalCredits } = calculateGPA(effective, coursesCatalog);
+        setCurrentStats({ gpa, credits: totalCredits });
+        setLoading(false); // إخفاء اللودينج فوراً
       }
+
+      // 2. تحديث البيانات في الخلفية
+      if (navigator.onLine) {
+        try {
+          const [profile, allDepts] = await Promise.all([
+            getAcademicProfile(),
+            getDepartments()
+          ]);
+
+          if (profile) {
+            localStorage.setItem("studyhub-academic-profile", JSON.stringify(profile));
+            if (allDepts) {
+              localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
+              const deptObject = allDepts.find((d: DepartmentItem) => d.id === profile.department);
+              setDepartmentName(deptObject ? deptObject.name : "");
+            }
+
+            const allRecords = (profile.semesters || []).flatMap((s: any) => s.courses);
+            const effective = getEffectiveRecords(allRecords);
+            const { gpa, totalCredits } = calculateGPA(effective, coursesCatalog);
+            setCurrentStats({ gpa, credits: totalCredits });
+          }
+        } catch (error) {
+          console.error("Offline mode: using cached simulator data.");
+        }
+      }
+      setLoading(false);
     }
     loadInitialData();
   }, []);

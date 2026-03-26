@@ -7,7 +7,7 @@ import { Loader2, ChevronDown, ChevronUp, BookX, Search, Users } from "lucide-re
 import { Input } from "@/components/ui/input";
 
 import { getAllStudents } from "@/lib/adminActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+import { calculateGPA, getEffectiveRecords } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses";
 
 interface FailedCourse {
