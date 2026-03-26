@@ -1,7 +1,7 @@
 "use client"
 
-import { use, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useStudy } from "@/lib/study-context"
 import { LectureItem } from "@/components/lecture-item"
 import { AddLectureDialog } from "@/components/add-lecture-dialog"
@@ -21,22 +21,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Trash2, BookOpen, CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react" // أضفنا Loader2
+import { ArrowLeft, Trash2, BookOpen, CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react"
 
-interface SubjectDetailPageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
-  const { id } = use(params)
+// 1. فصلنا المحتوى في Component داخلي عشان نقدر نستخدم useSearchParams بأمان
+function SubjectDetailContent() {
   const router = useRouter()
-  // سحبنا isLoading هنا
+  const searchParams = useSearchParams()
+  const id = searchParams.get("id") // سحبنا الـ ID من الرابط: ?id=...
+  
   const { subjects, deleteSubject, getSubjectProgress, reorderLectures, isLoading } = useStudy()
   
   const [isDeleting, setIsDeleting] = useState(false)
   const subject = subjects.find((s) => s.id === id)
 
-  // 1. لو السياق لسه بيقرأ من الـ LocalStorage نعرض لودينج بدل رسالة الخطأ
   if (isLoading) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
@@ -46,7 +43,6 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
     )
   }
 
-  // 2. لو المادة فعلاً مش موجودة بعد ما التحميل خلص
   if (!subject) {
     if (isDeleting) {
       return (
@@ -223,5 +219,19 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+// 2. المكون الأساسي اللي هيتم تصديره وتغليفه بـ Suspense
+export default function SubjectDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري تحميل بيانات المادة...</p>
+      </div>
+    }>
+      <SubjectDetailContent />
+    </Suspense>
   )
 }

@@ -20,7 +20,7 @@ export function SubjectCard({ subject }: SubjectCardProps) {
   const completedCount = subject.lectures.filter((l) => l.status === "completed").length
 
   return (
-    <Link href={`/subjects/${subject.id}`}>
+    <Link href={`/subjects/view?id=${subject.id}`}>
       <Card className="group cursor-pointer transition-all hover:shadow-lg hover:border-primary/50">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">

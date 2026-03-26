@@ -114,7 +114,10 @@ export function Dashboard() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {subjects.map((subject) => (
-              <SubjectCard key={subject.id} subject={subject} />
+              <SubjectCard 
+                key={subject.id} 
+                subject={subject} 
+              />
             ))}
             {subjects.length === 0 && (
               <Card className="col-span-full">

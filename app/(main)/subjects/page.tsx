@@ -23,15 +23,19 @@ export default function SubjectsPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {subjects.map((subject) => (
+          /* تأكد من تعديل مكون SubjectCard ليدعم اللينك الجديد، 
+            أو إذا كان الكارت يفتح الرابط داخلياً، ستحتاج لتعديل ملف SubjectCard نفسه.
+          */
           <SubjectCard key={subject.id} subject={subject} />
         ))}
+        
         {subjects.length === 0 && (
           <Card className="col-span-full">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <BookOpen className="h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No subjects yet</h3>
+              <h3 className="mt-4 text-lg font-semibold">لا يوجد مواد دراسية</h3>
               <p className="text-sm text-muted-foreground">
-                Click &quot;Add Subject&quot; to create your first course
+                اضغط على &quot;إضافة مادة&quot; لإنشاء أول مادة لك
               </p>
             </CardContent>
           </Card>
