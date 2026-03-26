@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import webpush from "web-push";
 import { checkIsAdmin, getAllStudents } from "@/lib/adminActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+import { calculateGPA, getEffectiveRecords } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses";
 
 webpush.setVapidDetails(

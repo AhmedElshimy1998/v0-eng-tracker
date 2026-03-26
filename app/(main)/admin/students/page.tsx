@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 
 import { getAllStudents, saveAdvisingNotes, getAdvisingNotes } from "@/lib/adminActions";
 import { getDepartments, DepartmentItem } from "@/lib/academicActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+import { calculateGPA, getEffectiveRecords } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses";
 
 

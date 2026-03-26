@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
 import { getAllStudents } from "@/lib/adminActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/gpaLogic";
+import { calculateGPA, getEffectiveRecords } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses";
 
 interface LevelStat {
