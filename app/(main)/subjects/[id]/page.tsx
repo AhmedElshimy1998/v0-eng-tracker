@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Trash2, BookOpen, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { ArrowLeft, Trash2, BookOpen, CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react" // أضفنا Loader2
 
 interface SubjectDetailPageProps {
   params: Promise<{ id: string }>
@@ -30,13 +30,24 @@ interface SubjectDetailPageProps {
 export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
   const { id } = use(params)
   const router = useRouter()
-  const { subjects, deleteSubject, getSubjectProgress, reorderLectures } = useStudy()
+  // سحبنا isLoading هنا
+  const { subjects, deleteSubject, getSubjectProgress, reorderLectures, isLoading } = useStudy()
   
   const [isDeleting, setIsDeleting] = useState(false)
   const subject = subjects.find((s) => s.id === id)
 
-  if (!subject) {
+  // 1. لو السياق لسه بيقرأ من الـ LocalStorage نعرض لودينج بدل رسالة الخطأ
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">جاري تحميل بيانات المادة...</p>
+      </div>
+    )
+  }
 
+  // 2. لو المادة فعلاً مش موجودة بعد ما التحميل خلص
+  if (!subject) {
     if (isDeleting) {
       return (
         <div className="flex flex-col items-center justify-center py-24">
@@ -48,12 +59,12 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
     }
     return (
       <div className="flex flex-col items-center justify-center py-24">
-        <h1 className="text-2xl font-bold">Subject not found</h1>
+        <h1 className="text-2xl font-bold">المادة غير موجودة</h1>
         <p className="text-muted-foreground mt-2">
-          The subject you&apos;re looking for doesn&apos;t exist.
+          المادة التي تبحث عنها غير موجودة أو تم حذفها.
         </p>
         <Button className="mt-4" onClick={() => router.push("/subjects")}>
-          Back to Subjects
+          العودة للمواد
         </Button>
       </div>
     )
@@ -69,9 +80,9 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
   }
 
   const handleDelete = () => {
-    setIsDeleting(true) // نفعل حالة الحذف أولاً
-    deleteSubject(subject!.id) // مسح المادة
-    router.push("/subjects") // التوجيه للصفحة الرئيسية
+    setIsDeleting(true) 
+    deleteSubject(subject!.id) 
+    router.push("/subjects") 
   }
 
   const handleMoveUp = (index: number) => {
@@ -108,20 +119,19 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
           <AlertDialogTrigger asChild>
             <Button variant="destructive" size="sm">
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete Subject
+              حذف المادة
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Subject</AlertDialogTitle>
+              <AlertDialogTitle>حذف المادة</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete &quot;{subject.title}&quot;? This action cannot
-                be undone and will remove all lectures, notes, and exams.
+                هل أنت متأكد من رغبتك في حذف مادة &quot;{subject.title}&quot;؟ هذا الإجراء لا يمكن التراجع عنه وسيحذف جميع المحاضرات والمهام والامتحانات الخاصة بها.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>حذف</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -130,7 +140,7 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Progress</CardTitle>
+            <CardTitle className="text-sm font-medium">التقدم</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center py-2">
@@ -141,34 +151,34 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium">مكتمل</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.completed}</div>
-            <p className="text-xs text-muted-foreground">lectures</p>
+            <p className="text-xs text-muted-foreground">محاضرة</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <CardTitle className="text-sm font-medium">قيد الدراسة</CardTitle>
             <Clock className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.inProgress}</div>
-            <p className="text-xs text-muted-foreground">lectures</p>
+            <p className="text-xs text-muted-foreground">محاضرة</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Not Started</CardTitle>
+            <CardTitle className="text-sm font-medium">لم تبدأ</CardTitle>
             <XCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.notStarted}</div>
-            <p className="text-xs text-muted-foreground">lectures</p>
+            <p className="text-xs text-muted-foreground">محاضرة</p>
           </CardContent>
         </Card>
       </div>
@@ -176,7 +186,7 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Lectures & Labs</h2>
+            <h2 className="text-xl font-semibold">المحاضرات والسكاشن</h2>
             <AddLectureDialog subjectId={subject.id} />
           </div>
 
@@ -184,9 +194,9 @@ export default function SubjectDetailPage({ params }: SubjectDetailPageProps) {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <BookOpen className="h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">No lectures yet</h3>
+                <h3 className="mt-4 text-lg font-semibold">لا يوجد محاضرات</h3>
                 <p className="text-sm text-muted-foreground">
-                  Add your first lecture to get started
+                  أضف أول محاضرة لتبدأ المذاكرة
                 </p>
               </CardContent>
             </Card>

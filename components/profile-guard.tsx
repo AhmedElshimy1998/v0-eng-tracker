@@ -8,26 +8,34 @@ import { Loader2 } from "lucide-react";
 export function ProfileGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  
+  // فصلنا حالة "السماح" عن حالة "التحميل" عشان ميعملش ريفريش مع كل كليك
   const [isAllowed, setIsAllowed] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // لو هو أصلاً في صفحة الإعدادات، سيبه يشوفها عشان يكمل بياناته
+    // لو هو في صفحة الإعدادات، نفتحله فوراً
     if (pathname === "/settings") {
       setIsAllowed(true);
+      setIsChecking(false);
       return;
     }
 
+    // ⭐ السطر ده هو الحل السحري! 
+    // لو الحارس فحصه قبل كدا وسمحله، متعملش فحص تاني مع كل تنقل بين الصفحات
+    if (isAllowed) return;
+
     const checkProfile = async () => {
-      setIsAllowed(false);
+      setIsChecking(true);
       
-      // 1. الفحص المحلي أولاً (للسرعة والأوفلاين)
+      // 1. الفحص المحلي أولاً
       const localProfileStr = localStorage.getItem("studyhub-academic-profile");
       if (localProfileStr) {
         try {
           const localProfile = JSON.parse(localProfileStr);
-          // لو البيانات كاملة محلياً، افتح الباب فوراً وبدون انتظار السيرفر
           if (localProfile && localProfile.name && localProfile.department && localProfile.phone) {
             setIsAllowed(true);
+            setIsChecking(false); // افتح الباب فوراً
             return; 
           }
         } catch (e) {
@@ -35,7 +43,7 @@ export function ProfileGuard({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2. لو مفيش بيانات محلية (أو ناقصة)، نسأل السيرفر (لو فيه نت)
+      // 2. لو مفيش بيانات محلية، نسأل السيرفر
       if (navigator.onLine) {
         try {
           const profile = await getAcademicProfile();
@@ -43,26 +51,23 @@ export function ProfileGuard({ children }: { children: React.ReactNode }) {
           if (!profile || !profile.name || !profile.department || !profile.phone) {
             router.replace("/settings");
           } else {
-            // نحفظها محلياً عشان المرة الجاية يفتح في ثانية
             localStorage.setItem("studyhub-academic-profile", JSON.stringify(profile));
             setIsAllowed(true);
           }
         } catch (error) {
-          console.error("Failed to fetch profile from server");
-          // في حالة خطأ السيرفر، نوديه الإعدادات كإجراء احترازي
           router.replace("/settings");
         }
       } else {
-        // لو أوفلاين ومفيش أي داتا محلية خالص، لازم يروح الإعدادات
         router.replace("/settings");
       }
+      setIsChecking(false);
     };
 
     checkProfile();
-  }, [pathname, router]);
+  }, [pathname, router, isAllowed]); // الحارس بقى أذكى وبيراقب حالة السماح
 
-  // لو الحارس لسه بيفحص أو قرر يمنعه (ومش في صفحة الإعدادات)، نعرض شاشة التحميل
-  if (!isAllowed && pathname !== "/settings") {
+  // لو الحارس لسه بيفحص بجد (مش مجرد تنقل)، نعرض شاشة التحميل
+  if (isChecking && pathname !== "/settings") {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background z-50">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -71,6 +76,6 @@ export function ProfileGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // لو بياناته كاملة، افتحله الموقع عادي
+  // لو بياناته كاملة، افتحله الموقع وتصفح براحتك
   return <>{children}</>;
 }
