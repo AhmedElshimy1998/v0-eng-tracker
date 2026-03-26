@@ -3,61 +3,68 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Bell, X, BellRing } from "lucide-react"
+import { BellRing, X } from "lucide-react"
+import { usePromptManager } from "@/hooks/use-floating-prompts" // استيراد المنظم اللي عملته
 
 export function NotificationPrompt() {
   const [isVisible, setIsVisible] = useState(false)
-  const [isSupported, setIsSupported] = useState(true)
+  const { activePrompts, register, unregister } = usePromptManager()
+  const id = "push-notif" // معرف فريد لهذا الكرت
 
   useEffect(() => {
-    // 1. التأكد أن المتصفح يدعم الإشعارات
-    if (!("Notification" in window)) {
-      setIsSupported(false)
-      return
-    }
+    // 1. فحص دعم المتصفح وحالة الإذن
+    if (!("Notification" in window)) return
 
-    // 2. فحص الحالة: لو "default" يعني لسه مسألناهوش، لو "denied" يعني رافض
-    // إحنا عايزينه يظهر لو مش "granted" (يعني مش مفعل)
     if (Notification.permission !== "granted") {
-      // فحص لو قفل النافذة في الجلسة الحالية (عشان متبقاش مزعجة جداً أثناء التنقل)
       const isClosedInSession = sessionStorage.getItem("push-prompt-closed")
       if (isClosedInSession !== "true") {
         setIsVisible(true)
+        register(id) // تسجيل الكرت في المنظم فور ظهوره
       }
     }
-  }, [])
+
+    return () => unregister(id) // تنظيف عند مغادرة الصفحة
+  }, [register, unregister])
 
   const handleEnable = async () => {
     try {
       const permission = await Notification.requestPermission()
       if (permission === "granted") {
         setIsVisible(false)
-        console.log("✅ تم تفعيل الإشعارات بنجاح!")
-        // هنا المكون اللي إنت عامله (NotificationManager) هيكمل شغل التسجيل
+        unregister(id) // مسحه من المنظم عشان الكروت اللي فوقه تنزل
       }
     } catch (error) {
-      console.error("Error requesting notification permission:", error)
+      console.error("Error requesting permission:", error)
     }
   }
 
   const handleClose = () => {
     setIsVisible(false)
+    unregister(id) // مسحه من المنظم فوراً عند الإغلاق
     sessionStorage.setItem("push-prompt-closed", "true")
   }
 
-  if (!isVisible || !isSupported) return null
+  // 2. الحساب السحري للمكان
+  const index = activePrompts.indexOf(id)
+  // 170 هو الارتفاع التقريبي للكرت + المسافة بين الكروت
+  const bottomOffset = index !== -1 ? (index * 170) + 16 : 16
+
+  if (!isVisible || index === -1) return null
 
   return (
-    <div className="fixed bottom-24 left-4 right-4 z-[99] md:left-auto md:right-8 md:bottom-32 md:w-96 animate-in fade-in slide-in-from-bottom-5 duration-500">
-      <Card className="p-4 shadow-2xl border-yellow-500/20 bg-background/95 backdrop-blur-md border-2">
+    <div 
+      style={{ bottom: `${bottomOffset}px` }}
+      className="fixed left-4 right-4 z-[99] md:left-auto md:right-8 md:w-96 transition-all duration-500 ease-in-out"
+    >
+      <Card className="p-4 shadow-2xl border-yellow-500/20 bg-background/95 backdrop-blur-md border-2 animate-in slide-in-from-bottom-5">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex gap-3">
+          <div className="flex gap-3 text-right">
             <div className="bg-yellow-500/10 p-2 rounded-lg h-fit">
               <BellRing className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-right">فعل التنبيهات الذكية</h3>
-              <p className="text-xs text-muted-foreground mt-1 text-right leading-relaxed">
+              <h3 className="font-bold text-sm">فعل التنبيهات الذكية</h3>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 لا تفوت محاضراتك! فعل الإشعارات لتصلك تنبيهات قبل الموعد بـ 30 و 15 دقيقة.
               </p>
             </div>
