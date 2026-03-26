@@ -2,58 +2,81 @@
 
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { getAcademicProfile } from "@/lib/academicActions";
 import { Loader2 } from "lucide-react";
 
 export function ProfileGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
   
-  // الـ useRef هنا بمثابة "ختم الدخول الدائم" طول الجلسة
-  // قيمته بتتغير فوراً ومش بتعمل ريفرش داخلي للصفحة
-  const hasChecked = useRef(false);
+  // التحكم في ظهور المحتوى
+  const [isAllowed, setIsAllowed] = useState(false);
+  
+  // أختام الحماية (عشان نمنع اللوب والتعليق)
+  const hasChecked = useRef(false); // هل كشفنا عليه في الجلسة دي؟
+  const isFetching = useRef(false); // هل في عملية فحص شغالة دلوقتي؟
 
   useEffect(() => {
-    // 1. لو إحنا في الإعدادات، نفتح الباب ونعلم إننا فحصنا
-    if (pathname === "/settings") {
-      setIsChecking(false);
-      hasChecked.current = true;
+    // 1. السماح الدائم لصفحة الإعدادات
+    if (pathname?.startsWith("/settings")) {
+      setIsAllowed(true);
       return;
     }
 
-    // 2. لو فحصنا قبل كدا، متعملش أي حاجة تاني خالص (ده اللي بيمنع التعليق عند التنقل)
+    // 2. لو كشفنا عليه ولقيناه سليم، متعملش لودينج تاني عند التنقل
     if (hasChecked.current) {
-      setIsChecking(false); // للتأكيد فقط
+      setIsAllowed(true);
       return;
     }
 
-    // 3. فحص محلي فوري وسريع جداً (بدون انتظار سيرفر نهائياً)
-    const verifyProfileInstantly = () => {
+    // تأمين الواجهة: لو بيحاول يفتح صفحة محمية وهو لسه متفحصش، اقفل الباب مؤقتاً
+    setIsAllowed(false);
+
+    // 3. منع التداخل لو الدالة شغالة بالفعل (عشان المتصفح ميعلقش)
+    if (isFetching.current) return;
+
+    const verifyProfile = async () => {
+      isFetching.current = true;
+
       try {
+        // أ. الفحص المحلي أولاً (في أجزاء من الثانية)
         const localStr = localStorage.getItem("studyhub-academic-profile");
         if (localStr) {
           const profile = JSON.parse(localStr);
-          // لو البيانات كاملة
           if (profile?.name && profile?.department && profile?.phone) {
-            hasChecked.current = true; // ختمنا الدخول في الذاكرة
-            setIsChecking(false); // شيل شاشة التحميل فوراً
+            hasChecked.current = true; // ختم الدخول
+            setIsAllowed(true);
+            isFetching.current = false;
+            return;
+          }
+        }
+
+        // ب. خطة بديلة: الفحص من السيرفر (مهم جداً لو داخل من جهاز جديد أو مسح الكاش)
+        if (navigator.onLine) {
+          const profile = await getAcademicProfile();
+          if (profile && profile.name && profile.department && profile.phone) {
+            // نحفظ الداتا محلياً عشان المرة الجاية يفتح في ثانية
+            localStorage.setItem("studyhub-academic-profile", JSON.stringify(profile));
+            hasChecked.current = true; // ختم الدخول
+            setIsAllowed(true);
+            isFetching.current = false;
             return;
           }
         }
       } catch (e) {
-        console.error("Error reading profile", e);
+        console.error("Profile verification error:", e);
       }
 
-      // 4. لو مفيش بيانات محلية، هنوديه للإعدادات مباشرة بدل ما نعلق المتصفح بطلب السيرفر
+      // ج. لو كل المحاولات فشلت، نوديه الإعدادات بأمان
+      isFetching.current = false;
       router.replace("/settings");
     };
 
-    verifyProfileInstantly();
+    verifyProfile();
   }, [pathname, router]);
 
-  // شاشة التحميل هتظهر فقط لأجزاء من الثانية في أول مرة تفتح فيها الموقع
-  // استخدمنا fixed inset-0 عشان تغطي الشاشة كلها وتمنع أي تعارض في العرض
-  if (isChecking && pathname !== "/settings") {
+  // شاشة التحميل الثابتة
+  if (!isAllowed && !pathname?.startsWith("/settings")) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -62,6 +85,6 @@ export function ProfileGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // لو بياناته كاملة، افتحله الموقع وتصفح براحتك
+  // لو بياناته كاملة، افتح الباب
   return <>{children}</>;
 }
