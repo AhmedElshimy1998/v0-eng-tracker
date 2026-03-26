@@ -25,17 +25,30 @@ export default function AIMentorPage() {
 
   const loadAnalysis = async () => {
     setLoading(true)
-    const result = await getSmartAnalysis()
-    
-    // فحص إذا تم الوصول للحد الأقصى (24 ساعة)
-    if (result?.isLimitReached) {
-      setData({ limitMessage: result.message }); 
-      setLoading(false);
-      return;
-    }
+    try {
+      const result = await getSmartAnalysis()
+      
+      // فحص إذا تم الوصول للحد الأقصى (24 ساعة)
+      if (result?.isLimitReached) {
+        setData({ limitMessage: result.message }); 
+        return;
+      }
 
-    setData(result)
-    setLoading(false)
+      // لو البيانات رجعت بنجاح
+      if (result) {
+        setData(result)
+      } else {
+        // لو الـ Backend رجع null بسبب خطأ
+        setData(null)
+      }
+    } catch (error) {
+      // لو حصل Timeout أو خطأ في الاتصال
+      console.error("Failed to load analysis:", error);
+      setData(null);
+    } finally {
+      // إيقاف اللودينج في جميع الحالات (نجاح أو فشل)
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
