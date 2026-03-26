@@ -40,29 +40,28 @@ export async function saveAcademicProfile(data: any) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
     
-    // مفتاح المستخدم في قاعدة البيانات
-    const key = `studyhub-academic-profile-${userId}`; 
+    // 🚨 تنبيه مهم: تأكد إن المفتاح ده هو نفس اللي بتستخدمه في دالة getAcademicProfile
+    const key = `academic-profile-${userId}`; 
     
-    // جلب الداتا الحالية من السيرفر (لو مفيش، بنعمل داتا فاضية)
     const existingData: any = (await kv.get(key)) || { name: "", phone: "", department: "", semesters: [], lastUpdated: 0 };
     
-    // 🛡️ الدرع الجميل: المقارنة الزمنية (مين الأحدث؟)
     const serverTime = existingData.lastUpdated || 0;
-    const incomingTime = data.lastUpdated || 0;
+    const incomingTime = data.lastUpdated; // هنا ممكن تكون undefined لو جاية من كود قديم
 
-    // لو الداتا اللي متسجلة في السيرفر وقتها "أكبر/أحدث" من اللي جاية من المتصفح
-    // يبقى المتصفح ده كان أوفلاين وجايب داتا قديمة.. نرفض التحديث فوراً!
-    if (serverTime > incomingTime) {
+    // 🛡️ الدرع الذكي: يرفض بس لو فيه وقت مبعوت وكان فعلاً أقدم من السيرفر
+    if (incomingTime !== undefined && serverTime > incomingTime) {
        console.log("⚠️ تم رفض التحديث: بيانات السيرفر أحدث.");
        return { success: false, error: "Server data is newer" };
     }
 
-    // ✅ لو وصلنا هنا، معناه إن الداتا اللي جاية "أحدث" (أو متساويين)
-    // هننفذ كلامها هي ونعمل الاستبدال اللي بيحل مشكلة الحذف
+    // ⏱️ لو مفيش وقت مبعوت (زي في صفحة 16)، السيرفر هياخد وقت اللحظة دي ويختم بيه
+    const finalTime = incomingTime !== undefined ? incomingTime : Date.now();
+
+    // الاستبدال الكامل عشان الحذف يشتغل
     const newData = { 
         ...existingData, 
-        ...data, // استبدال كامل للمصفوفة
-        lastUpdated: incomingTime // تحديث وقت السيرفر للوقت الجديد
+        ...data, 
+        lastUpdated: finalTime
     };
     
     await kv.set(key, newData);
