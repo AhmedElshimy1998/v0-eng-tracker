@@ -27,7 +27,7 @@ export default function SemesterTrackerPage() {
   // 1. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
     const loadProfile = async () => {
-      // 1. القراءة الفورية من الجهاز (المصدر الأول للحقيقة حالياً)
+      // 1. القراءة الفورية من الجهاز
       const localProfileStr = localStorage.getItem("studyhub-academic-profile");
       const localDeptsStr = localStorage.getItem("studyhub-global-departments");
       let localLastUpdated = 0;
@@ -37,6 +37,13 @@ export default function SemesterTrackerPage() {
         setStudentDept(localData.department || "");
         if (localData.semesters) setSemesters(localData.semesters);
         localLastUpdated = localData.lastUpdated || 0;
+
+        // ⭐ التعديل اللي رجعناه: ترجمة الـ ID للاسم العربي من الكاش
+        if (localDeptsStr && localData.department) {
+          const depts = JSON.parse(localDeptsStr);
+          const deptObject = depts.find((d: any) => d.id === localData.department);
+          if (deptObject) setActualDeptName(deptObject.name);
+        }
         setIsLoading(false);
       }
 
@@ -52,22 +59,19 @@ export default function SemesterTrackerPage() {
             const serverLastUpdated = data.lastUpdated || 0;
             const needsSync = localStorage.getItem("academic-needs-sync") === "true";
 
-            // الكود السحري: 
-            // ممنوع نحدث من السيرفر لو:
-            // أ- السيرفر قديم (تاريخه أقل من اللي عندنا محلي)
-            // ب- فيه علامة مزامنة معلقة (يعني إنت لسه مغير درجة وماتررفعتش)
             if (!needsSync && serverLastUpdated > localLastUpdated) {
-              console.log("🔄 Updating from server: Server is newer.");
               setStudentDept(data.department || "");
               if (data.semesters) setSemesters(data.semesters);
               localStorage.setItem("studyhub-academic-profile", JSON.stringify(data));
-            } else {
-              console.log("✅ Keeping local data: Local is newer or sync pending.");
             }
             
-            // تحديث الأقسام (دي مفيش فيها مشكلة)
             if (allDepts) {
               localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
+              
+              // ⭐ التعديل اللي رجعناه: ترجمة الـ ID للاسم العربي من السيرفر
+              const currentDeptId = data.department || (localProfileStr ? JSON.parse(localProfileStr).department : "");
+              const deptObject = allDepts.find((d: any) => d.id === currentDeptId);
+              if (deptObject) setActualDeptName(deptObject.name);
             }
           }
         } catch (e) {
@@ -153,9 +157,9 @@ export default function SemesterTrackerPage() {
     return coursesCatalog.filter(c => 
       c.department === "General" || 
       c.department === "المواد العامة (جامعة/كلية)" || 
-      c.department === studentDept // التطابق المباشر 100% مع قسم الطالب
+      c.department === actualDeptName
     );
-  }, [studentDept]); // التحديث بيحصل بناءً على قسم الطالب من الداتا بيز
+  }, [actualDeptName]);
 
   const officialSemesters = [
     "Level Zero - Term 1", "Level Zero - Term 2", "Level Zero - Summer",
