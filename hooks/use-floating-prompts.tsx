@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 
 interface PromptContextType {
-  activePrompts: string[]
+  activePrompts: string []
   register: (id: string) => void
   unregister: (id: string) => void
 }
