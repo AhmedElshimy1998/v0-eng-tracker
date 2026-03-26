@@ -47,7 +47,7 @@ export function NotificationPrompt() {
   // 2. الحساب السحري للمكان
   const index = activePrompts.indexOf(id)
   // 170 هو الارتفاع التقريبي للكرت + المسافة بين الكروت
-  const bottomOffset = index !== -1 ? (index * 170) + 16 : 16
+  const bottomOffset = index !== -1 ? (index * 210) + 16 : 16
 
   if (!isVisible || index === -1) return null
 
@@ -56,7 +56,7 @@ export function NotificationPrompt() {
       style={{ bottom: `${bottomOffset}px` }}
       className="fixed left-4 right-4 z-[99] md:left-auto md:right-8 md:w-96 transition-all duration-500 ease-in-out"
     >
-      <Card className="p-4 shadow-2xl border-yellow-500/20 bg-background/95 backdrop-blur-md border-2 animate-in slide-in-from-bottom-5">
+      <Card className="p-4 mb-4 shadow-2xl border-yellow-500/20 bg-background/95 backdrop-blur-md border-2 animate-in slide-in-from-bottom-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex gap-3 text-right">
             <div className="bg-yellow-500/10 p-2 rounded-lg h-fit">

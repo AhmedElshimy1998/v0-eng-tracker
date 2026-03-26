@@ -59,7 +59,7 @@ export function InstallPWA() {
 
   // حساب الموقع الديناميكي (Index * الارتفاع التقريبي + المسافة الأصلية)
   const index = activePrompts.indexOf(id)
-  const bottomOffset = index !== -1 ? (index * 170) + 16 : 16
+  const bottomOffset = index !== -1 ? (index * 210) + 16 : 16
 
   if (!isVisible || index === -1) return null
 
@@ -68,7 +68,7 @@ export function InstallPWA() {
       style={{ bottom: `${bottomOffset}px` }}
       className="fixed left-4 right-4 z-[100] md:left-auto md:right-8 md:w-96 transition-all duration-500 ease-in-out"
     >
-      <Card className="p-4 shadow-2xl border-primary/20 bg-background/95 backdrop-blur-md animate-in slide-in-from-bottom-10">
+      <Card className="p-4 mb-4 shadow-2xl border-primary/20 bg-background/95 backdrop-blur-md animate-in slide-in-from-bottom-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex gap-3">
             <div className="bg-primary/10 p-2 rounded-lg h-fit">
