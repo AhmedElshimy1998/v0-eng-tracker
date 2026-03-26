@@ -35,45 +35,41 @@ export async function getAcademicProfile() {
   }
 }
 
-export async function saveAcademicProfile(data: Partial<AcademicProfile>) {
+export async function saveAcademicProfile(data: any) {
   try {
-    const { userId } = await auth(); 
+    const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
     
-    const key = `academic-profile-${userId}`;
-    const existingData = (await kv.get<AcademicProfile>(key)) || { semesters: [], lastUpdated: 0 };
+    // مفتاح المستخدم في قاعدة البيانات
+    const key = `studyhub-academic-profile-${userId}`; 
     
-    // المزامنة الذكية: لو السيرفر أحدث فعلياً، ارفض التعديل (عشان متمسحش داتا جديدة من جهاز تاني)
-    if (data.lastUpdated && existingData.lastUpdated && data.lastUpdated < existingData.lastUpdated) {
-       return { success: true, note: "Ignored: Server is newer" }; 
+    // جلب الداتا الحالية من السيرفر (لو مفيش، بنعمل داتا فاضية)
+    const existingData: any = (await kv.get(key)) || { name: "", phone: "", department: "", semesters: [], lastUpdated: 0 };
+    
+    // 🛡️ الدرع الجميل: المقارنة الزمنية (مين الأحدث؟)
+    const serverTime = existingData.lastUpdated || 0;
+    const incomingTime = data.lastUpdated || 0;
+
+    // لو الداتا اللي متسجلة في السيرفر وقتها "أكبر/أحدث" من اللي جاية من المتصفح
+    // يبقى المتصفح ده كان أوفلاين وجايب داتا قديمة.. نرفض التحديث فوراً!
+    if (serverTime > incomingTime) {
+       console.log("⚠️ تم رفض التحديث: بيانات السيرفر أحدث.");
+       return { success: false, error: "Server data is newer" };
     }
 
-    let mergedSemesters = [...existingData.semesters];
-
-    if (data.semesters) {
-      data.semesters.forEach((newSem) => {
-        const existingSemIndex = mergedSemesters.findIndex(s => s.name === newSem.name);
-        
-        if (existingSemIndex > -1) {
-          // ⭐ هنا السر: طالما نسخة المستخدم أحدث، نعتمد قائمة مواده بالكامل لهذا الترم
-          // ده بيسمح بالحذف (لو شال مادة) والتعديل (لو غير درجة)
-          mergedSemesters[existingSemIndex].courses = newSem.courses;
-        } else {
-          mergedSemesters.push(newSem);
-        }
-      });
-    }
-
+    // ✅ لو وصلنا هنا، معناه إن الداتا اللي جاية "أحدث" (أو متساويين)
+    // هننفذ كلامها هي ونعمل الاستبدال اللي بيحل مشكلة الحذف
     const newData = { 
         ...existingData, 
-        ...data,
-        semesters: mergedSemesters,
-        lastUpdated: Date.now() // تحديث الـ Timestamp الرسمي على السيرفر
+        ...data, // استبدال كامل للمصفوفة
+        lastUpdated: incomingTime // تحديث وقت السيرفر للوقت الجديد
     };
     
     await kv.set(key, newData);
     return { success: true };
+    
   } catch (error) {
+    console.error("Failed to save academic profile:", error);
     return { success: false };
   }
 }
