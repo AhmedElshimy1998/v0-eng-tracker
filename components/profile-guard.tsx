@@ -1,77 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getAcademicProfile } from "@/lib/academicActions";
 import { Loader2 } from "lucide-react";
 
 export function ProfileGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  
-  // فصلنا حالة "السماح" عن حالة "التحميل" عشان ميعملش ريفريش مع كل كليك
-  const [isAllowed, setIsAllowed] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  
+  // الـ useRef هنا بمثابة "ختم الدخول الدائم" طول الجلسة
+  // قيمته بتتغير فوراً ومش بتعمل ريفرش داخلي للصفحة
+  const hasChecked = useRef(false);
 
   useEffect(() => {
-    // لو هو في صفحة الإعدادات، نفتحله فوراً
+    // 1. لو إحنا في الإعدادات، نفتح الباب ونعلم إننا فحصنا
     if (pathname === "/settings") {
-      setIsAllowed(true);
       setIsChecking(false);
+      hasChecked.current = true;
       return;
     }
 
-    // ⭐ السطر ده هو الحل السحري! 
-    // لو الحارس فحصه قبل كدا وسمحله، متعملش فحص تاني مع كل تنقل بين الصفحات
-    if (isAllowed) return;
+    // 2. لو فحصنا قبل كدا، متعملش أي حاجة تاني خالص (ده اللي بيمنع التعليق عند التنقل)
+    if (hasChecked.current) {
+      setIsChecking(false); // للتأكيد فقط
+      return;
+    }
 
-    const checkProfile = async () => {
-      setIsChecking(true);
-      
-      // 1. الفحص المحلي أولاً
-      const localProfileStr = localStorage.getItem("studyhub-academic-profile");
-      if (localProfileStr) {
-        try {
-          const localProfile = JSON.parse(localProfileStr);
-          if (localProfile && localProfile.name && localProfile.department && localProfile.phone) {
-            setIsAllowed(true);
-            setIsChecking(false); // افتح الباب فوراً
-            return; 
+    // 3. فحص محلي فوري وسريع جداً (بدون انتظار سيرفر نهائياً)
+    const verifyProfileInstantly = () => {
+      try {
+        const localStr = localStorage.getItem("studyhub-academic-profile");
+        if (localStr) {
+          const profile = JSON.parse(localStr);
+          // لو البيانات كاملة
+          if (profile?.name && profile?.department && profile?.phone) {
+            hasChecked.current = true; // ختمنا الدخول في الذاكرة
+            setIsChecking(false); // شيل شاشة التحميل فوراً
+            return;
           }
-        } catch (e) {
-          console.error("Error parsing local profile", e);
         }
+      } catch (e) {
+        console.error("Error reading profile", e);
       }
 
-      // 2. لو مفيش بيانات محلية، نسأل السيرفر
-      if (navigator.onLine) {
-        try {
-          const profile = await getAcademicProfile();
-          
-          if (!profile || !profile.name || !profile.department || !profile.phone) {
-            router.replace("/settings");
-          } else {
-            localStorage.setItem("studyhub-academic-profile", JSON.stringify(profile));
-            setIsAllowed(true);
-          }
-        } catch (error) {
-          router.replace("/settings");
-        }
-      } else {
-        router.replace("/settings");
-      }
-      setIsChecking(false);
+      // 4. لو مفيش بيانات محلية، هنوديه للإعدادات مباشرة بدل ما نعلق المتصفح بطلب السيرفر
+      router.replace("/settings");
     };
 
-    checkProfile();
-  }, [pathname, router, isAllowed]); // الحارس بقى أذكى وبيراقب حالة السماح
+    verifyProfileInstantly();
+  }, [pathname, router]);
 
-  // لو الحارس لسه بيفحص بجد (مش مجرد تنقل)، نعرض شاشة التحميل
+  // شاشة التحميل هتظهر فقط لأجزاء من الثانية في أول مرة تفتح فيها الموقع
+  // استخدمنا fixed inset-0 عشان تغطي الشاشة كلها وتمنع أي تعارض في العرض
   if (isChecking && pathname !== "/settings") {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background z-50">
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground font-medium text-lg">جاري تجهيز بيئة العمل الخاصة بك...</p>
+        <p className="text-muted-foreground font-medium text-lg">جاري تجهيز بيئة العمل...</p>
       </div>
     );
   }

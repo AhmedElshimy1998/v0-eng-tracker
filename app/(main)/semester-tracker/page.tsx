@@ -26,24 +26,27 @@ export default function SemesterTrackerPage() {
   // 2. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
     const loadProfile = async () => {
-      // أ. القراءة الفورية من المتصفح لسرعة العرض
+      // أ. القراءة الفورية
       const localProfileStr = localStorage.getItem("studyhub-academic-profile");
       const localDeptsStr = localStorage.getItem("studyhub-global-departments");
+
+      let localLastUpdated = 0; // عشان نقارن بيه وقت السيرفر
 
       if (localProfileStr) {
         const localData = JSON.parse(localProfileStr);
         setStudentDept(localData.department || "");
         if (localData.semesters) setSemesters(localData.semesters);
+        localLastUpdated = localData.lastUpdated || 0; // سحبنا وقت آخر تعديل
         
         if (localDeptsStr) {
            const depts = JSON.parse(localDeptsStr);
            const deptObj = depts.find((d: DepartmentItem) => d.id === localData.department);
            if (deptObj) setActualDeptName(deptObj.name);
         }
-        setIsLoading(false); // إخفاء التحميل فوراً!
+        setIsLoading(false); 
       }
 
-      // ب. جلب أحدث بيانات من السيرفر في الخلفية لو فيه نت
+      // ب. جلب السيرفر بذكاء
       if (navigator.onLine) {
         try {
           const [data, allDepts] = await Promise.all([
@@ -52,12 +55,18 @@ export default function SemesterTrackerPage() {
           ]);
           
           if (data) {
-            setStudentDept(data.department || "");
-            if (data.semesters) setSemesters(data.semesters);
-            localStorage.setItem("studyhub-academic-profile", JSON.stringify(data));
+            const needsSync = localStorage.getItem("academic-needs-sync") === "true";
+            const serverLastUpdated = data.lastUpdated || 0;
+
+            // الحماية: مش هنحدث من السيرفر إلا لو داتا السيرفر أحدث فعلياً ومفيش مزامنة معلقة
+            if (!needsSync && serverLastUpdated >= localLastUpdated) {
+              setStudentDept(data.department || "");
+              if (data.semesters) setSemesters(data.semesters);
+              localStorage.setItem("studyhub-academic-profile", JSON.stringify(data));
+            }
             
             if (allDepts) {
-              const deptObject = allDepts.find((d: DepartmentItem) => d.id === data.department);
+              const deptObject = allDepts.find((d: DepartmentItem) => d.id === (data.department || studentDept));
               if (deptObject) setActualDeptName(deptObject.name);
               localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
             }

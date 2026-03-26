@@ -38,30 +38,33 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   // 1. جلب البيانات (أوفلاين أولاً ثم السحابة)
+  // 1. جلب البيانات (أوفلاين أولاً ثم السحابة)
   useEffect(() => {
     async function loadData() {
-      // القراءة من التخزين المحلي فوراً لسرعة العرض
-      const localData = localStorage.getItem("studyhub-local-data")
-      if (localData) {
-        setSubjects(JSON.parse(localData))
-        setIsLoading(false) // إخفاء اللودينج فوراً لو فيه داتا محلية
+      const localDataStr = localStorage.getItem("studyhub-local-data")
+      if (localDataStr) {
+        setSubjects(JSON.parse(localDataStr))
+        setIsLoading(false)
       }
 
-      // محاولة المزامنة مع السحابة في الخلفية
       if (navigator.onLine) {
         try {
           const cloudSubjects = await getCloudData()
-          if (cloudSubjects !== null && cloudSubjects !== undefined && Array.isArray(cloudSubjects)) {
+          // التريكة هنا: هل في داتا محلية لسه بتترفع؟
+          const needsSync = localStorage.getItem("needs-sync") === "true"
+          
+          // متسمحش للسيرفر يمسح الداتا لو إنت لسه معدل حاجة ومفيش مزامنة معلقة
+          if (!needsSync && cloudSubjects !== null && cloudSubjects !== undefined && Array.isArray(cloudSubjects)) {
             setSubjects(cloudSubjects)
             localStorage.setItem("studyhub-local-data", JSON.stringify(cloudSubjects))
-          } else if (!localData) {
+          } else if (!localDataStr) {
             setSubjects(mockSubjects)
             localStorage.setItem("studyhub-local-data", JSON.stringify(mockSubjects))
           }
         } catch (error) {
           console.log("Offline or cloud fetch failed, relying on local data.")
         }
-      } else if (!localData) {
+      } else if (!localDataStr) {
         setSubjects(mockSubjects)
       }
       
