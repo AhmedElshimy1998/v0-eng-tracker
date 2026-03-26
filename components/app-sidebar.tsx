@@ -10,16 +10,16 @@ import { Button } from "@/components/ui/button"
 import { checkIsAdmin } from "@/lib/adminActions"
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Subjects", href: "/subjects", icon: BookOpen },
-  { name: "Calendar", href: "/calendar", icon: Calendar },
-  { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap },
-  { name: "AI Smart Advisor", href: "/ai-mentor", icon: BrainCircuit },
-  { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map }, 
-  { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator }, 
-  { name: "الأخبار والإشعارات", href: "/news", icon: Newspaper },
-  { name: "Settings", href: "/settings", icon: Settings },
-  { name: "Admin Dashboard", href: "/admin", icon: Shield, adminOnly: true }, 
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, prefetch: true },
+  { name: "Subjects", href: "/subjects", icon: BookOpen, prefetch: true },
+  { name: "Calendar", href: "/calendar", icon: Calendar, prefetch: true },
+  { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap, prefetch: true },
+  { name: "AI Smart Advisor", href: "/ai-mentor", icon: BrainCircuit, prefetch: true },
+  { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map, prefetch: true }, 
+  { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator, prefetch: true }, 
+  { name: "الأخبار والإشعارات", href: "/news", icon: Newspaper, prefetch: true },
+  { name: "Settings", href: "/settings", icon: Settings, prefetch: true },
+  { name: "Admin Dashboard", href: "/admin", icon: Shield, adminOnly: true, prefetch: false }, 
 ]
 
 export function AppSidebar() {
