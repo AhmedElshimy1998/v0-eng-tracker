@@ -14,13 +14,13 @@ export function InstallPWA() {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
     if (isStandalone) return
 
-    // 2. التأكد أن المستخدم مقفلش النافذة في الجلسة الحالية (Session)
+    // 2. فحص السيشين (لو قفلها قبل كدة في نفس الجلسة)
     const isClosedInSession = sessionStorage.getItem("pwa-prompt-closed")
     if (isClosedInSession === "true") return
 
-    // 3. الإمساك بحدث التثبيت
     const handler = (e: any) => {
       e.preventDefault()
+      // حفظ الحدث لاستخدامه عند الضغط على زر التثبيت
       setDeferredPrompt(e)
       setIsVisible(true)
     }
@@ -30,41 +30,25 @@ export function InstallPWA() {
     return () => window.removeEventListener("beforeinstallprompt", handler)
   }, [])
 
-  // ... باقي الكود فوق كما هو ...
+  // ⭐ الدالة اللي كانت ناقصة ومسببة المشكلة
+  const handleInstall = async () => {
+    if (!deferredPrompt) return
+    
+    // إظهار نافذة التثبيت الخاصة بالمتصفح
+    deferredPrompt.prompt()
+    
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === "accepted") {
+      setDeferredPrompt(null)
+      setIsVisible(false)
+    }
+  }
 
   const handleClose = () => {
-    setIsVisible(false); // إخفاء المكون من الشاشة فوراً
-    setDeferredPrompt(null); // مسح الحدث المخزن
-    sessionStorage.setItem("pwa-prompt-closed", "true"); // منع الظهور في هذه الجلسة
-  };
-
-  useEffect(() => {
-    // 1. التأكد أن المستخدم مش فاتح من الـ PWA فعلاً
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) return;
-
-    // 2. فحص السيشين (هل المستخدم أغلق النافذة مسبقاً في هذه الجلسة؟)
-    const isClosedInSession = sessionStorage.getItem("pwa-prompt-closed");
-    if (isClosedInSession === "true") {
-      setIsVisible(false);
-      return;
-    }
-
-    const handler = (e: any) => {
-      e.preventDefault();
-      // تأكيد إضافي قبل العرض: لو قفلها من ثانية واحدة مش هنعرضها تاني
-      if (sessionStorage.getItem("pwa-prompt-closed") !== "true") {
-        setDeferredPrompt(e);
-        setIsVisible(true);
-      }
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  // ... باقي كود الـ JSX تحت كما هو ...
+    setIsVisible(false)
+    // منع الظهور مرة أخرى في هذه الجلسة
+    sessionStorage.setItem("pwa-prompt-closed", "true")
+  }
 
   if (!isVisible) return null
 
@@ -77,8 +61,8 @@ export function InstallPWA() {
               <Download className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-bold text-sm">تثبيت StudyHub</h3>
-              <p className="text-xs text-muted-foreground mt-1">
+              <h3 className="font-bold text-sm">تثبيت Eng-Tracker</h3>
+              <p className="text-xs text-muted-foreground mt-1 text-right">
                 ثبت التطبيق على جهازك للوصول السريع والمذاكرة أوفلاين.
               </p>
             </div>
@@ -88,7 +72,7 @@ export function InstallPWA() {
           </Button>
         </div>
         <div className="mt-4 flex gap-2">
-          <Button className="w-full text-xs h-9" onClick={handleInstall}>
+          <Button className="w-full text-xs h-9 font-bold" onClick={handleInstall}>
             تثبيت الآن
           </Button>
           <Button variant="outline" className="w-full text-xs h-9" onClick={handleClose}>
