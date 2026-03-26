@@ -10,6 +10,23 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
+  // === إضافة الجزء الخاص بتكييش الصفحات الديناميكية أوفلاين ===
+  workboxOptions: {
+    runtimeCaching: [
+      {
+        // القاعدة اللي بتخلي صفحة العرض تفتح دايماً أوفلاين
+        urlPattern: /\/subjects\/view.*/i,
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'subjects-view-cache',
+          expiration: {
+            maxEntries: 20,
+            maxAgeSeconds: 30 * 24 * 60 * 60, // شهر
+          },
+        },
+      },
+    ],
+  },
 });
 
 /** @type {import('next').NextConfig} */
@@ -20,7 +37,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // السطر ده هو اللي هيسكت الإيرور اللي ظهرلك
   turbopack: {}, 
 };
 
