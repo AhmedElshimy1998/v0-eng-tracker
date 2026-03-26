@@ -9,7 +9,7 @@ const withPWA = withPWAInit({
   skipWaiting: true,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
+  reloadOnOnline: false,
   // === إضافة الجزء الخاص بتكييش الصفحات الديناميكية أوفلاين ===
         workboxOptions: {
     runtimeCaching: [

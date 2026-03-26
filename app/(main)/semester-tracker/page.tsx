@@ -109,20 +109,36 @@ export default function SemesterTrackerPage() {
 
   // 3. الحفظ الفوري (Optimistic Saving)
   const saveSemestersToCloud = async (updatedSemesters: SemesterData[]) => {
+    // 1. تحديث الـ State فوراً لضمان تجربة مستخدم سريعة (Optimistic UI)
     setSemesters(updatedSemesters); 
     
-    // حفظ محلي فوراً
+    // 2. الحفظ المحلي الفوري (عشان لو حصل ريفرش أو النت فصل)
     const localProfileStr = localStorage.getItem("studyhub-academic-profile");
     let profileObj = localProfileStr ? JSON.parse(localProfileStr) : {};
     profileObj.semesters = updatedSemesters;
-    profileObj.lastUpdated = Date.now(); // إضافة الطابع الزمني
+    profileObj.lastUpdated = Date.now(); // إضافة تايم ستامب للمزامنة الذكية
     localStorage.setItem("studyhub-academic-profile", JSON.stringify(profileObj));
 
-    // مزامنة سحابية لو فيه نت
+    // 3. تفعيل علامة "محتاج مزامنة" (دي الأمان بتاعنا لو الرفع فشل)
+    localStorage.setItem("academic-needs-sync", "true");
+
+    // 4. محاولة الرفع للسيرفر فوراً لو فيه إنترنت
     if (navigator.onLine) {
-      await saveAcademicProfile({ semesters: updatedSemesters, lastUpdated: profileObj.lastUpdated }); 
-    } else {
-      localStorage.setItem("academic-needs-sync", "true");
+      try {
+        console.log("📤 جاري محاولة رفع التعديلات الأكاديمية...");
+        const result = await saveAcademicProfile({ 
+          semesters: updatedSemesters, 
+          lastUpdated: profileObj.lastUpdated 
+        });
+        
+        if (result.success) {
+          // لو الرفع تم بنجاح، نشيل علامة الاحتياج للمزامنة
+          localStorage.setItem("academic-needs-sync", "false");
+          console.log("✅ تمت المزامنة الفورية بنجاح!");
+        }
+      } catch (e) {
+        console.log("⚠️ فشل الرفع الفوري، سيتم المحاولة مرة أخرى عند استقرار الاتصال.");
+      }
     }
   };
 
