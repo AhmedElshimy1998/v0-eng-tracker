@@ -26,18 +26,16 @@ export function NotificationPrompt() {
     return () => unregister(id) // تنظيف عند مغادرة الصفحة
   }, [register, unregister])
 
-  const handleEnable = async () => {
-    try {
-      const permission = await Notification.requestPermission()
-      if (permission === "granted") {
-        setIsVisible(false)
-        unregister(id) // مسحه من المنظم عشان الكروت اللي فوقه تنزل
-      }
-    } catch (error) {
-      console.error("Error requesting permission:", error)
-    }
-  }
+  const { handleAutoPushRegistration, unregister } = usePromptManager();
 
+            const handleEnable = async () => {
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                setIsVisible(false);
+                unregister(id);
+                await handleAutoPushRegistration(); // سجل الجهاز فوراً في قاعدة البيانات
+            }
+            };
   const handleClose = () => {
     setIsVisible(false)
     unregister(id) // مسحه من المنظم فوراً عند الإغلاق

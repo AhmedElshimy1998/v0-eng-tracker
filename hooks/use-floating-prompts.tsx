@@ -1,11 +1,14 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+// استيراد دالة التسجيل من السيرفس الخاص بك
+import { registerServiceWorker } from '@/lib/notification-service' 
 
 interface PromptContextType {
-  activePrompts: string []
+  activePrompts: string[]
   register: (id: string) => void
   unregister: (id: string) => void
+  handleAutoPushRegistration: () => Promise<void> 
 }
 
 const PromptContext = createContext<PromptContextType | undefined>(undefined)
@@ -21,8 +24,21 @@ export function PromptProvider({ children }: { children: React.ReactNode }) {
     setActivePrompts((prev) => prev.filter((p) => p !== id))
   }, [])
 
+  // ⭐ استخدام الدالة الجاهزة من السيرفس الخاص بك
+  const handleAutoPushRegistration = useCallback(async () => {
+    if (typeof window !== "undefined" && Notification.permission === "granted") {
+      console.log("[PromptProvider] Initiating auto-registration...");
+      await registerServiceWorker(); // هتعمل الـ subscribe وتحفظ في الـ KV أوتوماتيك
+    }
+  }, []);
+
+  // تشغيل التسجيل تلقائياً بمجرد توفر الصلاحية
+  useEffect(() => {
+    handleAutoPushRegistration();
+  }, [handleAutoPushRegistration]);
+
   return (
-    <PromptContext.Provider value={{ activePrompts, register, unregister }}>
+    <PromptContext.Provider value={{ activePrompts, register, unregister, handleAutoPushRegistration }}>
       {children}
     </PromptContext.Provider>
   )
