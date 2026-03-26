@@ -27,7 +27,7 @@ export default function SemesterTrackerPage() {
   // 1. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
     const loadProfile = async () => {
-      // أ. القراءة الفورية من LocalStorage
+      // 1. القراءة الفورية من الجهاز (المصدر الأول للحقيقة حالياً)
       const localProfileStr = localStorage.getItem("studyhub-academic-profile");
       const localDeptsStr = localStorage.getItem("studyhub-global-departments");
       let localLastUpdated = 0;
@@ -40,16 +40,9 @@ export default function SemesterTrackerPage() {
         setIsLoading(false);
       }
 
-      // ب. جلب السيرفر بذكاء (الفرملة هنا)
       if (navigator.onLine) {
-        // لو فيه مزامنة معلقة، متجيبش داتا من السيرفر دلوقتي عشان متمسحش اللي كتبناه
-        const needsSync = localStorage.getItem("academic-needs-sync") === "true";
-        if (needsSync) {
-          console.log("⏳ Waiting for sync to finish before fetching from server...");
-          return; 
-        }
-
         try {
+          // 2. جلب بيانات السيرفر
           const [data, allDepts] = await Promise.all([
             getAcademicProfile(),
             getDepartments()
@@ -57,14 +50,28 @@ export default function SemesterTrackerPage() {
           
           if (data) {
             const serverLastUpdated = data.lastUpdated || 0;
-            if (serverLastUpdated >= localLastUpdated) {
+            const needsSync = localStorage.getItem("academic-needs-sync") === "true";
+
+            // الكود السحري: 
+            // ممنوع نحدث من السيرفر لو:
+            // أ- السيرفر قديم (تاريخه أقل من اللي عندنا محلي)
+            // ب- فيه علامة مزامنة معلقة (يعني إنت لسه مغير درجة وماتررفعتش)
+            if (!needsSync && serverLastUpdated > localLastUpdated) {
+              console.log("🔄 Updating from server: Server is newer.");
               setStudentDept(data.department || "");
               if (data.semesters) setSemesters(data.semesters);
               localStorage.setItem("studyhub-academic-profile", JSON.stringify(data));
+            } else {
+              console.log("✅ Keeping local data: Local is newer or sync pending.");
+            }
+            
+            // تحديث الأقسام (دي مفيش فيها مشكلة)
+            if (allDepts) {
+              localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
             }
           }
         } catch (e) {
-          console.log("Offline mode: using cached academic data.");
+          console.error("Failed to fetch academic data:", e);
         }
       }
       setIsLoading(false);
