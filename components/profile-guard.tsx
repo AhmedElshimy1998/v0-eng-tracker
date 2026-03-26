@@ -19,21 +19,49 @@ export function ProfileGuard({ children }: { children: React.ReactNode }) {
 
     const checkProfile = async () => {
       setIsAllowed(false);
-      const profile = await getAcademicProfile();
       
-      // الشروط: لازم البروفايل يكون موجود + فيه اسم + فيه قسم + فيه رقم تليفون
-      if (!profile || !profile.name || !profile.department || !profile.phone) {
-        // لو أي حاجة ناقصة، اخطفه ووديه الإعدادات وامسح الهيستوري عشان ميعرفش يرجع ورا
-        router.replace("/settings");
+      // 1. الفحص المحلي أولاً (للسرعة والأوفلاين)
+      const localProfileStr = localStorage.getItem("studyhub-academic-profile");
+      if (localProfileStr) {
+        try {
+          const localProfile = JSON.parse(localProfileStr);
+          // لو البيانات كاملة محلياً، افتح الباب فوراً وبدون انتظار السيرفر
+          if (localProfile && localProfile.name && localProfile.department && localProfile.phone) {
+            setIsAllowed(true);
+            return; 
+          }
+        } catch (e) {
+          console.error("Error parsing local profile", e);
+        }
+      }
+
+      // 2. لو مفيش بيانات محلية (أو ناقصة)، نسأل السيرفر (لو فيه نت)
+      if (navigator.onLine) {
+        try {
+          const profile = await getAcademicProfile();
+          
+          if (!profile || !profile.name || !profile.department || !profile.phone) {
+            router.replace("/settings");
+          } else {
+            // نحفظها محلياً عشان المرة الجاية يفتح في ثانية
+            localStorage.setItem("studyhub-academic-profile", JSON.stringify(profile));
+            setIsAllowed(true);
+          }
+        } catch (error) {
+          console.error("Failed to fetch profile from server");
+          // في حالة خطأ السيرفر، نوديه الإعدادات كإجراء احترازي
+          router.replace("/settings");
+        }
       } else {
-        setIsAllowed(true);
+        // لو أوفلاين ومفيش أي داتا محلية خالص، لازم يروح الإعدادات
+        router.replace("/settings");
       }
     };
 
     checkProfile();
   }, [pathname, router]);
 
-  // لو الحارس لسه بيفحص أو قرر يمنعه (ومش في صفحة الإعدادات)، نعرضله شاشة تحميل لطيفة بدل المحتوى
+  // لو الحارس لسه بيفحص أو قرر يمنعه (ومش في صفحة الإعدادات)، نعرض شاشة التحميل
   if (!isAllowed && pathname !== "/settings") {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background z-50">
