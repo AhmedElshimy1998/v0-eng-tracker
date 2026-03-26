@@ -27,28 +27,28 @@ export default function SemesterTrackerPage() {
   // 1. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
     const loadProfile = async () => {
-      // أ. القراءة الفورية من المتصفح
+      // أ. القراءة الفورية من LocalStorage
       const localProfileStr = localStorage.getItem("studyhub-academic-profile");
       const localDeptsStr = localStorage.getItem("studyhub-global-departments");
-
-      let localLastUpdated = 0; 
+      let localLastUpdated = 0;
 
       if (localProfileStr) {
         const localData = JSON.parse(localProfileStr);
         setStudentDept(localData.department || "");
         if (localData.semesters) setSemesters(localData.semesters);
-        localLastUpdated = localData.lastUpdated || 0; 
-        
-        if (localDeptsStr) {
-           const depts = JSON.parse(localDeptsStr);
-           const deptObj = depts.find((d: any) => d.id === localData.department);
-           if (deptObj) setActualDeptName(deptObj.name);
-        }
-        setIsLoading(false); 
+        localLastUpdated = localData.lastUpdated || 0;
+        setIsLoading(false);
       }
 
-      // ب. جلب بيانات السيرفر بذكاء
+      // ب. جلب السيرفر بذكاء (الفرملة هنا)
       if (navigator.onLine) {
+        // لو فيه مزامنة معلقة، متجيبش داتا من السيرفر دلوقتي عشان متمسحش اللي كتبناه
+        const needsSync = localStorage.getItem("academic-needs-sync") === "true";
+        if (needsSync) {
+          console.log("⏳ Waiting for sync to finish before fetching from server...");
+          return; 
+        }
+
         try {
           const [data, allDepts] = await Promise.all([
             getAcademicProfile(),
@@ -56,20 +56,11 @@ export default function SemesterTrackerPage() {
           ]);
           
           if (data) {
-            const needsSync = localStorage.getItem("academic-needs-sync") === "true";
             const serverLastUpdated = data.lastUpdated || 0;
-
-            // الحماية: تحديث محلي فقط إذا كان السيرفر أحدث ولا توجد تعديلات محلية معلقة
-            if (!needsSync && serverLastUpdated >= localLastUpdated) {
+            if (serverLastUpdated >= localLastUpdated) {
               setStudentDept(data.department || "");
               if (data.semesters) setSemesters(data.semesters);
               localStorage.setItem("studyhub-academic-profile", JSON.stringify(data));
-            }
-            
-            if (allDepts) {
-              const deptObject = allDepts.find((d: any) => d.id === (data.department || (localProfileStr ? JSON.parse(localProfileStr).department : "")));
-              if (deptObject) setActualDeptName(deptObject.name);
-              localStorage.setItem("studyhub-global-departments", JSON.stringify(allDepts));
             }
           }
         } catch (e) {
@@ -92,29 +83,25 @@ export default function SemesterTrackerPage() {
           if (localProfileStr) {
             const localData = JSON.parse(localProfileStr);
             
-            console.log("🔄 جاري مزامنة المسار الأكاديمي مع السيرفر...");
-            
-            // محاولة حفظ البيانات على السيرفر
+            // رفع البيانات (الأكشن المعدل اللي بيعمل Merge)
             const result = await saveAcademicProfile({ 
               semesters: localData.semesters, 
-              lastUpdated: localData.lastUpdated || Date.now() 
+              lastUpdated: Date.now() 
             });
             
             if (result.success) {
               localStorage.setItem("academic-needs-sync", "false");
-              console.log("✅ تمت المزامنة الأكاديمية بنجاح!");
+              console.log("✅ Data synced and merged successfully!");
+              // مبروك، دلوقتي مسموح للصفحة تجيب داتا فريش من السيرفر لو حبت
             }
           }
         } catch (e) {
-          console.error("❌ فشلت المزامنة الأكاديمية التلقائية:", e);
+          console.error("❌ Sync failed:", e);
         }
       }
     };
 
-    // مراقبة حدث العودة للاتصال
     window.addEventListener('online', handleAcademicOnline);
-    
-    // تشغيل فحص فوري عند تحميل الصفحة (لو النت شغال وفيه داتا مركونة)
     handleAcademicOnline(); 
 
     return () => window.removeEventListener('online', handleAcademicOnline);
