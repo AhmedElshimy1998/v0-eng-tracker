@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { StudyProvider } from '@/lib/study-context'
-import { InstallPWA } from "@/components/install-pwa"
+import { InstallPWA } from "@/components/InstallPWA"
 import './globals.css'
 
 export const maxDuration = 60;
