@@ -30,21 +30,41 @@ export function InstallPWA() {
     return () => window.removeEventListener("beforeinstallprompt", handler)
   }, [])
 
-  const handleInstall = async () => {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    if (outcome === "accepted") {
-      setDeferredPrompt(null)
-      setIsVisible(false)
-    }
-  }
+  // ... باقي الكود فوق كما هو ...
 
   const handleClose = () => {
-    setIsVisible(false)
-    // حفظ حالة الإغلاق في السيشين فقط (تروح لما يقفل التابة/المتصفح)
-    sessionStorage.setItem("pwa-prompt-closed", "true")
-  }
+    setIsVisible(false); // إخفاء المكون من الشاشة فوراً
+    setDeferredPrompt(null); // مسح الحدث المخزن
+    sessionStorage.setItem("pwa-prompt-closed", "true"); // منع الظهور في هذه الجلسة
+  };
+
+  useEffect(() => {
+    // 1. التأكد أن المستخدم مش فاتح من الـ PWA فعلاً
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) return;
+
+    // 2. فحص السيشين (هل المستخدم أغلق النافذة مسبقاً في هذه الجلسة؟)
+    const isClosedInSession = sessionStorage.getItem("pwa-prompt-closed");
+    if (isClosedInSession === "true") {
+      setIsVisible(false);
+      return;
+    }
+
+    const handler = (e: any) => {
+      e.preventDefault();
+      // تأكيد إضافي قبل العرض: لو قفلها من ثانية واحدة مش هنعرضها تاني
+      if (sessionStorage.getItem("pwa-prompt-closed") !== "true") {
+        setDeferredPrompt(e);
+        setIsVisible(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  // ... باقي كود الـ JSX تحت كما هو ...
 
   if (!isVisible) return null
 
