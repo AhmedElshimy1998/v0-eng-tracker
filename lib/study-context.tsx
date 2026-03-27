@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from "react"
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react"
 import { Subject, Lecture, Exam, Task, Resource, LectureStatus, Schedule } from "./types"
 import { mockSubjects } from "./mock-data"
 import { getCloudData, saveCloudData } from "./actions"
@@ -36,122 +36,112 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  
-  // 🛡️ درع جديد يمنع الحفظ التلقائي إنه يشتغل بالغلط أول ما الصفحة تفتح
-  const isFirstRender = useRef(true) 
 
+  // 1. التهيئة وجلب البيانات المباشر
   useEffect(() => {
-    async function loadData() {
+    let mounted = true;
+
+    async function initData() {
       try {
-        const localDataStr = localStorage.getItem("studyhub-local-data")
-        const localSubjects: Subject[] = localDataStr ? JSON.parse(localDataStr) : []
+        const localStr = localStorage.getItem("studyhub-local-data");
+        const localData: Subject[] = localStr ? JSON.parse(localStr) : [];
         
-        if (localDataStr) {
-          setSubjects(localSubjects)
+        if (!navigator.onLine) {
+          if (mounted) setSubjects(localData);
+          return;
         }
 
-        if (navigator.onLine) {
-          const cloudData = await getCloudData()
+        const cloudResponse = await getCloudData();
+        
+        if (!cloudResponse) {
+          if (mounted) setSubjects(localData);
+          return;
+        }
+
+        const { subjects: cloudData, isNewUser } = cloudResponse;
+
+        // حالة الزيرو الحقيقية
+        if (isNewUser && cloudData.length === 0 && localData.length === 0) {
+          const initialMock = mockSubjects.map(s => ({ ...s, updatedAt: Date.now() }));
+          if (mounted) setSubjects(initialMock);
+          localStorage.setItem("studyhub-local-data", JSON.stringify(initialMock));
+          await saveCloudData(initialMock);
+        } else {
+          // دمج ذكي بدون فزلكة
+          const mergedMap = new Map<string, Subject>();
+          if (Array.isArray(cloudData)) {
+            cloudData.forEach(s => mergedMap.set(s.id, s));
+          }
           
-          if (cloudData === undefined) {
-            setIsLoading(false)
-            return // إياك تفك القفل لو مفيش اتصال
-          }
-
-          const { subjects: cloudSubjects, isNewUser } = cloudData
-
-          if (isNewUser && cloudSubjects.length === 0 && localSubjects.length === 0) {
-            const mockWithTime = mockSubjects.map(s => ({...s, updatedAt: Date.now()}))
-            setSubjects(mockWithTime)
-          } else {
-            const subjectMap = new Map<string, Subject>()
-            let needsCloudUpdate = false
-
-            if (Array.isArray(cloudSubjects)) {
-              cloudSubjects.forEach(s => subjectMap.set(s.id, s))
+          let hasLocalUpdates = false;
+          localData.forEach(localItem => {
+            const cloudItem = mergedMap.get(localItem.id);
+            if (!cloudItem || (localItem.updatedAt || 0) > (cloudItem.updatedAt || 0)) {
+              mergedMap.set(localItem.id, localItem);
+              hasLocalUpdates = true;
             }
+          });
 
-            localSubjects.forEach(localSub => {
-              const cloudSub = subjectMap.get(localSub.id)
-              if (!cloudSub) {
-                subjectMap.set(localSub.id, localSub)
-                needsCloudUpdate = true
-              } else {
-                const localTime = localSub.updatedAt || 0
-                const cloudTime = cloudSub.updatedAt || 0
-                if (localTime > cloudTime) {
-                  subjectMap.set(localSub.id, localSub)
-                  needsCloudUpdate = true
-                }
-              }
-            })
-
-            const finalMerged = Array.from(subjectMap.values())
-            setSubjects(finalMerged)
-
-            if (needsCloudUpdate) {
-              saveCloudData(finalMerged).catch(() => localStorage.setItem("needs-sync", "true"))
-            }
+          const finalData = Array.from(mergedMap.values());
+          if (mounted) setSubjects(finalData);
+          localStorage.setItem("studyhub-local-data", JSON.stringify(finalData));
+          
+          if (hasLocalUpdates) {
+            saveCloudData(finalData);
           }
         }
-        setIsInitialized(true)
-      } catch (error) {
-        setIsInitialized(true) 
+      } catch (err) {
+        console.error("Error loading data:", err);
       } finally {
-        setIsLoading(false)
+        if (mounted) {
+          setIsInitialized(true);
+          setIsLoading(false);
+        }
       }
     }
-    loadData()
-  }, [])
+    
+    initData();
+    return () => { mounted = false };
+  }, []);
 
-  // ⚙️ محرك الحفظ التلقائي بعد إصلاح ثغرة الـ Refresh
+  // 2. محرك الحفظ الصارم (الآن هيشتغل فوراً مع أي تعديل)
   useEffect(() => {
     if (!isInitialized) return;
 
-    // الدرع ده بيخليه يتجاهل أول لفة، ويحفظ بس لما "إنت" تضيف أو تمسح حاجة
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
-    localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
+    localStorage.setItem("studyhub-local-data", JSON.stringify(subjects));
     
     if (navigator.onLine) {
       saveCloudData(subjects).then(res => {
-         // لو حصل إيرور في السيرفر هيكتب في الـ Console بدل ما يفشل في صمت
-         if (res && !res.success) {
-            console.error("⚠️ فشل الحفظ في السيرفر!");
-            localStorage.setItem("needs-sync", "true");
-         } else {
-            localStorage.setItem("needs-sync", "false");
-         }
-      }).catch(() => localStorage.setItem("needs-sync", "true"))
+        localStorage.setItem("needs-sync", res && res.success ? "false" : "true");
+      }).catch(() => {
+        localStorage.setItem("needs-sync", "true");
+      });
     } else {
-      localStorage.setItem("needs-sync", "true")
+      localStorage.setItem("needs-sync", "true");
     }
-  }, [subjects, isInitialized])
+  }, [subjects, isInitialized]);
 
+  // 3. مراقب الإنترنت
   useEffect(() => {
     const handleOnline = async () => {
-      const needsSync = localStorage.getItem("needs-sync")
+      const needsSync = localStorage.getItem("needs-sync");
       if (needsSync === "true") {
         try {
-          const currentLocalDataStr = localStorage.getItem("studyhub-local-data")
-          const currentLocalData = currentLocalDataStr ? JSON.parse(currentLocalDataStr) : []
-          if (currentLocalData.length > 0) {
-            const result = await saveCloudData(currentLocalData)
-            if (result.success) localStorage.setItem("needs-sync", "false")
+          const currentLocalStr = localStorage.getItem("studyhub-local-data");
+          const currentLocal = currentLocalStr ? JSON.parse(currentLocalStr) : [];
+          if (currentLocal.length > 0) {
+            const result = await saveCloudData(currentLocal);
+            if (result.success) localStorage.setItem("needs-sync", "false");
           }
         } catch(e) {}
       }
-    }
-    window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [])
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   const generateId = () => Math.random().toString(36).substring(2, 9)
 
-  // لاحظ هنا شيلنا دالة Onboarded اللي كانت بتعمل المشكلة
   const addSubject = useCallback((subject: Omit<Subject, "id" | "lectures" | "exams" | "schedules">) => {
     setSubjects((prev) => [
       ...prev,

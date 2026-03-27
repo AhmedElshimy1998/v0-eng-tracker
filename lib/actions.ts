@@ -6,16 +6,17 @@ import { auth } from "@/lib/auth-server"
 
 export async function getCloudData() {
   try {
-    const { userId } = await auth(); 
+    const { userId, isOnboarded } = await auth(); 
     if (!userId) return undefined; 
 
-    // 💡 بنسأل الداتا بيز: هل المستخدم ده رفع أي حاجة قبل كده؟
+    // بنسأل الداتا بيز: هل المستخدم ده رفع أي حاجة قبل كده؟
     const isKnownUser = await kv.get(`user-onboarded-${userId}`);
     const data = await kv.get<Subject[]>(`studyhub-cloud-data-${userId}`);
     
     return {
       subjects: data || [],
-      isNewUser: !isKnownUser // لو ملوش بصمة يبقى جديد
+      // المستخدم جديد فقط لو ملوش بصمة في Clerk ومندوش بصمة في Upstash
+      isNewUser: !(isOnboarded || isKnownUser) 
     };
   } catch (error) {
     return undefined;
@@ -27,19 +28,16 @@ export async function saveCloudData(subjects: Subject[]) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
-    // 1. حفظ المواد في السحابة
-    await kv.set(`studyhub-cloud-data-${userId}`, subjects)
+    // 1. حفظ المواد في السحابة فوراً
+    await kv.set(`studyhub-cloud-data-${userId}`, subjects);
 
-    // 2. وضع بصمة للمستخدم عشان السيستم يعرف إنه مبقاش جديد
-    // البصمة دي سريعة جداً ومبتعملش مشاكل في الكوكيز
-    if (subjects.length > 0) {
-      await kv.set(`user-onboarded-${userId}`, true);
-    }
+    // 2. وضع بصمة للمستخدم للأبد (حتى لو المصفوفة فاضية)
+    await kv.set(`user-onboarded-${userId}`, true);
 
-    return { success: true }
+    return { success: true };
   } catch (error) {
-    console.error("Failed to save to cloud:", error)
-    return { success: false }
+    console.error("Failed to save to cloud:", error);
+    return { success: false };
   }
 }
 
