@@ -13,34 +13,35 @@ webpush.setVapidDetails(
 
 export async function GET(request: Request) {
   try {
-    // 1. البحث عن كل مفاتيح المستخدمين المسجلين في قاعدة البيانات
+    // 1. أمر واحد لجلب كل المفاتيح
     const userKeys = await kv.keys("studyhub-cloud-data-*");
 
     if (!userKeys || userKeys.length === 0) {
       return NextResponse.json({ message: "No users data found" });
     }
 
-    // 2. ضبط الوقت على توقيت مصر
+    // 2. 🚀 جلب كل مواد الطلاب في (أمر واحد فقط)
+    const allUsersSubjects = await kv.mget(...userKeys);
+
     const egyptTimeOptions = { timeZone: "Africa/Cairo" };
     const nowString = new Date().toLocaleString("en-US", egyptTimeOptions);
     const now = new Date(nowString);
     const currentDay = now.getDay();
 
     let notificationsSent = 0;
+    const pendingNotifications: { userId: string, title: string, body: string, url: string }[] = [];
 
-    // 3. الدوران على كل مستخدم لفحص مواده
-    for (const key of userKeys) {
-      // استخراج كود المستخدم (userId) من اسم المفتاح
+    // 3. الفحص المحلي السريع (صفر أوامر للداتا بيز)
+    for (let i = 0; i < userKeys.length; i++) {
+      const key = userKeys[i];
       const userId = key.replace("studyhub-cloud-data-", "");
       
-      // جلب مواد هذا المستخدم تحديداً
-      const subjects: any[] = (await kv.get(key)) || [];
+      const subjects: any[] = allUsersSubjects[i] || [];
       if (subjects.length === 0) continue;
 
-      // فحص المحاضرات
       for (const subject of subjects) {
         for (const schedule of subject.schedules || []) {
-          if (schedule.dayOfWeek === currentDay) {
+          if (schedule.dayOfWeek === currentDay && schedule.time) {
             const [classHours, classMinutes] = schedule.time.split(":").map(Number);
             
             const classTime = new Date(now);
@@ -48,30 +49,49 @@ export async function GET(request: Request) {
 
             const diffInMinutes = Math.round((classTime.getTime() - now.getTime()) / 60000);
 
-            // إذا كان متبقي 30 أو 15 دقيقة
             if (diffInMinutes === 30 || diffInMinutes === 15) {
-              
-              // جلب "اشتراكات الإشعارات" الخاصة بهذا المستخدم فقط
-              const subscriptions: any[] = (await kv.get(`push-subscriptions-${userId}`)) || [];
-              
-              if (subscriptions.length > 0) {
-                const payload = JSON.stringify({
-                  title: `تنبيه: ${subject.title}`,
-                  body: `المحاضرة ستبدأ خلال ${diffInMinutes} دقيقة! ${schedule.location ? '\nالمكان: ' + schedule.location : ''}`,
-                  url: "/"
-                });
-
-                // إرسال الإشعار لكل أجهزة هذا المستخدم (موبايل، لابتوب، الخ)
-                for (const sub of subscriptions) {
-                  try {
-                    await webpush.sendNotification(sub, payload);
-                    notificationsSent++;
-                  } catch (err) {
-                    console.error(`Failed to send to user ${userId}:`, err);
-                  }
-                }
-              }
+              pendingNotifications.push({
+                userId,
+                title: `تنبيه: ${subject.title}`,
+                body: `المحاضرة ستبدأ خلال ${diffInMinutes} دقيقة! ${schedule.location ? '\nالمكان: ' + schedule.location : ''}`,
+                url: "/"
+              });
             }
+          }
+        }
+      }
+    }
+
+    if (pendingNotifications.length === 0) {
+      return NextResponse.json({ success: true, sent: 0, message: "No upcoming classes right now" });
+    }
+
+    // 4. 🚀 جلب اشتراكات الناس اللي هيبعتلهم بس في (أمر واحد فقط)
+    const uniqueUserIds = [...new Set(pendingNotifications.map(n => n.userId))];
+    const subKeys = uniqueUserIds.map(id => `push-subscriptions-${id}`);
+    const allSubscriptions = await kv.mget(...subKeys);
+
+    const subMap = new Map();
+    for (let i = 0; i < uniqueUserIds.length; i++) {
+      subMap.set(uniqueUserIds[i], allSubscriptions[i] || []);
+    }
+
+    // 5. إرسال الإشعارات
+    for (const notif of pendingNotifications) {
+      const userSubs = subMap.get(notif.userId);
+      if (userSubs && userSubs.length > 0) {
+        const payload = JSON.stringify({
+          title: notif.title,
+          body: notif.body,
+          url: notif.url
+        });
+
+        for (const sub of userSubs) {
+          try {
+            await webpush.sendNotification(sub, payload);
+            notificationsSent++;
+          } catch (err) {
+            console.error(`Failed to send to user ${notif.userId}:`, err);
           }
         }
       }

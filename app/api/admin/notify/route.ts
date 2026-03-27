@@ -23,41 +23,37 @@ export async function POST(req: Request) {
 
     const { title, message, filters } = await req.json();
 
+    // ⚠️ ملاحظة هامة: تأكد إن دالة getAllStudents في ملف adminActions متعدلة لـ mget زي ما اتفقنا قبل كده
     const students = await getAllStudents();
     debugLogs.push(`تم جلب ${students.length} طالب للفحص.`);
 
     let targetUserIds: string[] = [];
 
+    // الفلترة السريعة محلياً
     students.forEach(student => {
       const profile = student.profile;
       const semesters = profile.semesters || [];
       const allRecords = semesters.flatMap((s: any) => s.courses);
       const effectiveRecords = getEffectiveRecords(allRecords);
-      const { totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
+      const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog);
 
-      const studentLevel = Math.floor(totalCredits / 32).toString();
       let isMatch = true;
 
-      // 1. فلترة القسم (المقارنة بالاسم المسجل كما في لوحة الإدارة)
-      if (filters.department !== "all" && profile.department !== filters.department) {
-        isMatch = false;
+      // 1. فلتر المعدل
+      if (filters.gpaStatus === "atRisk" && cgpa >= 2.0) isMatch = false;
+      if (filters.gpaStatus === "safe" && cgpa < 2.0) isMatch = false;
+
+      // 2. فلتر المستوى
+      if (filters.level !== "all") {
+        const levelNum = Math.floor(totalCredits / 32);
+        const levelName = ["المستوى الصفري", "المستوى الأول", "المستوى الثاني", "المستوى الثالث", "المستوى الرابع"][Math.min(levelNum, 4)];
+        if (filters.level !== levelName) isMatch = false;
       }
 
-      // 2. فلترة المستوى
-      if (isMatch && filters.level !== "all" && studentLevel !== filters.level) {
-        isMatch = false;
-      }
-
-      // 3. فلترة الخريجين
-      if (isMatch && filters.isSenior && totalCredits < 130) {
-        isMatch = false;
-      }
-
-      // 4. فلترة المادة (تعديل منطق البحث ليكون أكثر مرونة مع المسميات الجديدة)
-      if (isMatch && filters.courseName) {
-        const searchStr = filters.courseName.toLowerCase().trim();
-        const hasCourse = allRecords.some(c => {
-          // البحث في الكود المسجل عند الطالب أو جلب بيانات المادة من الكتالوج للمطابقة
+      // 3. فلتر البحث
+      if (filters.search && filters.search.trim() !== "") {
+        const searchStr = filters.search.toLowerCase();
+        const hasCourse = allRecords.some((c: any) => {
           const courseInfo = coursesCatalog.find(cat => cat.code === c.courseCode);
           return c.courseCode.toLowerCase().includes(searchStr) || 
                  (courseInfo?.arabicName || "").includes(searchStr);
@@ -77,15 +73,23 @@ export async function POST(req: Request) {
       url: "/"
     });
 
-    for (const userId of targetUserIds) {
-      const subs: any[] = (await kv.get(`push-subscriptions-${userId}`)) || [];
-      if (subs.length > 0) {
-        for (const sub of subs) {
-          try {
-            await webpush.sendNotification(sub, payload);
-            notificationsSent++;
-          } catch (err: any) {
-            debugLogs.push(`فشل الإرسال لـ ${userId}: ${err.message}`);
+    // 🚀 التعديل السحري: جلب كل اشتراكات الطلاب المستهدفين في (أمر واحد فقط) بدل Loop!
+    if (targetUserIds.length > 0) {
+      const subscriptionKeys = targetUserIds.map(id => `push-subscriptions-${id}`);
+      const allSubscriptions = await kv.mget(...subscriptionKeys);
+
+      for (let i = 0; i < targetUserIds.length; i++) {
+        const userId = targetUserIds[i];
+        const subs: any[] = allSubscriptions[i] || [];
+
+        if (subs.length > 0) {
+          for (const sub of subs) {
+            try {
+              await webpush.sendNotification(sub, payload);
+              notificationsSent++;
+            } catch (err: any) {
+              debugLogs.push(`فشل الإرسال لـ ${userId}: ${err.message}`);
+            }
           }
         }
       }
@@ -93,12 +97,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      sentCount: notificationsSent, 
-      targetedUsers: targetUserIds.length, 
+      sent: notificationsSent, 
       logs: debugLogs 
     });
 
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message, logs: [error.message] }, { status: 500 });
+    debugLogs.push(`حدث خطأ غير متوقع: ${error.message}`);
+    return NextResponse.json({ success: false, error: error.message, logs: debugLogs }, { status: 500 });
   }
 }
