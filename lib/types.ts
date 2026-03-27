@@ -76,3 +76,62 @@ export interface SemesterData {
   semesterGpa: number;
   semesterCredits: number;
 }
+
+
+// ==========================================
+// 3. أنواع نظام إدارة المواد (Study Context)
+// ==========================================
+
+export type LectureStatus = "not-started" | "in-progress" | "completed";
+
+export interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Resource {
+  id: string;
+  title: string;
+  url: string;
+  type: "video" | "document" | "link";
+}
+
+export interface Lecture {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  status: LectureStatus;
+  tasks: Task[];
+  resources: Resource[];
+}
+
+export interface Exam {
+  id: string;
+  title: string;
+  date: string;
+  weight: number;
+  score?: number;
+}
+
+export interface Schedule {
+  id: string;
+  dayOfWeek: number; // 0 (الأحد) إلى 6 (السبت)
+  startTime: string;
+  endTime: string;
+  location?: string;
+  type: "lecture" | "section" | "lab";
+}
+
+export interface Subject {
+  id: string;
+  title: string;
+  code: string;
+  color: string;
+  lectures: Lecture[];
+  exams: Exam[];
+  schedules: Schedule[];
+  updatedAt?: number;  // ⏱️ وقت التعديل للمزامنة الذكية
+  isDeleted?: boolean; // 🗑️ الحذف الوهمي (Soft Delete)
+}

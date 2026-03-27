@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react"
 import { Subject, Lecture, Exam, Task, Resource, LectureStatus, Schedule } from "./types"
 import { mockSubjects } from "./mock-data"
-import { getCloudData, saveCloudData } from "./actions"
+// 🚨 تأكد إنك ضفت markAsOnboarded في الـ import من ملف actions
+import { getCloudData, saveCloudData, markAsOnboarded } from "./actions"
 
 interface StudyContextType {
   subjects: Subject[]
@@ -33,99 +34,122 @@ interface StudyContextType {
 const StudyContext = createContext<StudyContextType | undefined>(undefined)
 
 export function StudyProvider({ children }: { children: ReactNode }) {
+  // الـ State هنا بتحتفظ بكل المواد (حتى المحذوفة وهمياً عشان المزامنة)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // 1. جلب البيانات (أوفلاين أولاً ثم السحابة)
-  // 1. جلب البيانات (أوفلاين أولاً ثم السحابة)
+  // 1. جلب ومزامنة البيانات (الذكاء كله هنا)
   useEffect(() => {
     async function loadData() {
-  const localDataStr = localStorage.getItem("studyhub-local-data")
-  const localSubjects: Subject[] = localDataStr ? JSON.parse(localDataStr) : []
-  
-  // 1. لو فيه داتا محلي، اعرضها فوراً
-  if (localDataStr) {
-    setSubjects(localSubjects)
-    setIsLoading(false)
-  }
-
-  if (navigator.onLine) {
-    try {
-      const cloudSubjects = await getCloudData() // نكلم السيرفر نجيب أحدث نسخة
+      const localDataStr = localStorage.getItem("studyhub-local-data")
+      const localSubjects: Subject[] = localDataStr ? JSON.parse(localDataStr) : []
       
-      if (cloudSubjects && Array.isArray(cloudSubjects)) {
-        // 2. الدمج الذكي (الموبايل والكمبيوتر)
-        setSubjects((prevLocal) => {
-          const fromCloudOnly = cloudSubjects.filter(c => !prevLocal.find(l => l.id === c.id))
-          const updatedLocal = prevLocal.map(local => {
-            const cloudVersion = cloudSubjects.find(c => c.id === local.id)
-            return cloudVersion ? cloudVersion : local
-          })
-          const finalMerged = [...updatedLocal, ...fromCloudOnly]
-          localStorage.setItem("studyhub-local-data", JSON.stringify(finalMerged))
-          return finalMerged
-        })
-      } else if (!localDataStr && cloudSubjects === null) {
-        // 3. الحالة الوحيدة لعرض الـ Mock: مفيش محلي "و" السيرفر رد إنه null (مستخدم جديد فعلاً)
-        setSubjects(mockSubjects)
-        localStorage.setItem("studyhub-local-data", JSON.stringify(mockSubjects))
+      if (localDataStr) {
+        setSubjects(localSubjects)
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.log("Cloud fetch failed.")
+
+      if (navigator.onLine) {
+        try {
+          const cloudData = await getCloudData()
+          
+          // حماية الـ Auth
+          if (cloudData === undefined) {
+            setIsLoading(false)
+            return
+          }
+
+          const { subjects: cloudSubjects, isNewUser } = cloudData
+
+          if (isNewUser && localSubjects.length === 0) {
+            // مستخدم جديد زيرو: حط الـ Mock واختم بوقت دلوقتي
+            const mockWithTime = mockSubjects.map(s => ({...s, updatedAt: Date.now()}))
+            setSubjects(mockWithTime)
+            localStorage.setItem("studyhub-local-data", JSON.stringify(mockWithTime))
+          } else {
+            // 🧠 الدمج الذكي بناءً على الوقت (Timestamp Merge)
+            const subjectMap = new Map<string, Subject>()
+            let needsCloudUpdate = false
+
+            // أ- نحط داتا السيرفر الأول في الخريطة
+            if (Array.isArray(cloudSubjects)) {
+              cloudSubjects.forEach(s => subjectMap.set(s.id, s))
+            }
+
+            // ب- نلف على الداتا المحلية ونقارن
+            localSubjects.forEach(localSub => {
+              const cloudSub = subjectMap.get(localSub.id)
+              if (!cloudSub) {
+                // المادة اتعملت أوفلاين ولسه مترفعتش
+                subjectMap.set(localSub.id, localSub)
+                needsCloudUpdate = true
+              } else {
+                // المادة موجودة في الاتنين.. مين الأحدث؟
+                const localTime = localSub.updatedAt || 0
+                const cloudTime = cloudSub.updatedAt || 0
+                if (localTime > cloudTime) {
+                  subjectMap.set(localSub.id, localSub) // المحلي يكسب
+                  needsCloudUpdate = true
+                }
+              }
+            })
+
+            const finalMerged = Array.from(subjectMap.values())
+            setSubjects(finalMerged)
+            localStorage.setItem("studyhub-local-data", JSON.stringify(finalMerged))
+
+            // لو الموبايل كان فيه تعديلات أحدث، ارفعها فوراً
+            if (needsCloudUpdate) {
+              saveCloudData(finalMerged).catch(() => localStorage.setItem("needs-sync", "true"))
+            }
+          }
+        } catch (error) {
+          console.log("Cloud fetch failed.")
+        }
+      } else {
+        if (!localDataStr) setIsLoading(false)
+      }
+      
+      setIsInitialized(true)
+      setIsLoading(false)
     }
-  } else {
-    // 4. لو أوفلاين ومفيش داتا محلي (بسبب مسح الكاش): 
-    // يفضل نعرض شاشة "برجاء الاتصال بالنت لاسترجاع بياناتك" بدل ما نعرض Mock داتا
-    if (!localDataStr) {
-       setIsLoading(false) // عشان ميقفلش في لودينج، بس subjects هتفضل فاضية []
-    }
-  }
-  
-  setIsInitialized(true)
-  setIsLoading(false)
-}
     loadData()
   }, [])
 
-  // 2. حفظ أي تعديل جديد فوراً (محلياً ثم سحابياً)
+  // 2. محرك الحفظ التلقائي
   useEffect(() => {
-  // مسموح بالحفظ فقط لو تم الانتهاء من التحميل (initialized) والبيانات مش فاضية تماماً 
-  // (أو لو فاضية بس إحنا متأكدين إن المستخدم هو اللي مسحها)
-  if (isInitialized && subjects.length > 0) {
-    localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
-    
-    if (navigator.onLine) {
-      saveCloudData(subjects).catch(() => {
+    if (isInitialized && subjects.length > 0) {
+      localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
+      
+      if (navigator.onLine) {
+        saveCloudData(subjects).catch(() => {
+          localStorage.setItem("needs-sync", "true")
+        })
+      } else {
         localStorage.setItem("needs-sync", "true")
-      })
-    } else {
-      localStorage.setItem("needs-sync", "true")
+      }
     }
-  }
-}, [subjects, isInitialized])
+  }, [subjects, isInitialized])
 
-  // 3. مراقب عودة الإنترنت لرفع التعديلات المعلقة
+  // 3. مراقب عودة الإنترنت
   useEffect(() => {
     const handleOnline = async () => {
       const needsSync = localStorage.getItem("needs-sync")
       if (needsSync === "true") {
         try {
-          // جلب أحدث بيانات مدمجة من الذاكرة المحلية
           const currentLocalDataStr = localStorage.getItem("studyhub-local-data")
           const currentLocalData = currentLocalDataStr ? JSON.parse(currentLocalDataStr) : []
           
           if (currentLocalData.length > 0) {
-            // رفع البيانات للسحابة المرتبطة بـ userId الخاص بـ Clerk
             const result = await saveCloudData(currentLocalData)
-            
             if (result.success) {
               localStorage.setItem("needs-sync", "false")
               console.log("✅ All devices synced successfully!")
             }
           }
         } catch(e) {
-          console.error("❌ Background sync failed, will retry on next connection.")
+          console.error("❌ Background sync failed.")
         }
       }
     }
@@ -136,305 +160,187 @@ export function StudyProvider({ children }: { children: ReactNode }) {
 
   const generateId = () => Math.random().toString(36).substring(2, 9)
 
+  // ==========================================
+  // دوال التعديل (كلها بتحدث الـ updatedAt)
+  // ==========================================
+
   const addSubject = useCallback((subject: Omit<Subject, "id" | "lectures" | "exams" | "schedules">) => {
     setSubjects((prev) => [
       ...prev,
-      { ...subject, id: generateId(), lectures: [], exams: [], schedules: [] },
+      { ...subject, id: generateId(), lectures: [], exams: [], schedules: [], updatedAt: Date.now() },
     ])
+    // 🎯 المستخدم ضاف مادة بجد؟ اختم باسبوره إنه مبقاش جديد
+    markAsOnboarded().catch(() => {});
   }, [])
 
   const updateSubject = useCallback((id: string, data: Partial<Subject>) => {
     setSubjects((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...data } : s))
+      prev.map((s) => (s.id === id ? { ...s, ...data, updatedAt: Date.now() } : s))
     )
   }, [])
 
   const deleteSubject = useCallback((id: string) => {
-    setSubjects((prev) => prev.filter((s) => s.id !== id))
+    // 🗑️ الحذف الوهمي (Soft Delete): بنغير حالتها بدل ما نمسحها عشان السيرفر يعرف إنها اتحذفت
+    setSubjects((prev) => 
+      prev.map((s) => (s.id === id ? { ...s, isDeleted: true, updatedAt: Date.now() } : s))
+    )
   }, [])
 
-  const addLecture = useCallback(
-    (subjectId: string, lecture: Omit<Lecture, "id" | "order">) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          const newLecture: Lecture = {
-            ...lecture,
-            id: generateId(),
-            order: s.lectures.length,
-          }
-          return { ...s, lectures: [...s.lectures, newLecture] }
-        })
-      )
-    },
-    []
-  )
+  const addLecture = useCallback((subjectId: string, lecture: Omit<Lecture, "id" | "order">) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      const newLecture: Lecture = { ...lecture, id: generateId(), order: s.lectures.length }
+      return { ...s, lectures: [...s.lectures, newLecture], updatedAt: Date.now() }
+    }))
+  }, [])
 
-  const updateLecture = useCallback(
-    (subjectId: string, lectureId: string, data: Partial<Lecture>) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            lectures: s.lectures.map((l) =>
-              l.id === lectureId ? { ...l, ...data } : l
-            ),
-          }
-        })
-      )
-    },
-    []
-  )
+  const updateLecture = useCallback((subjectId: string, lectureId: string, data: Partial<Lecture>) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return {
+        ...s,
+        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, ...data } : l),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
   const deleteLecture = useCallback((subjectId: string, lectureId: string) => {
-    setSubjects((prev) =>
-      prev.map((s) => {
-        if (s.id !== subjectId) return s
-        return {
-          ...s,
-          lectures: s.lectures.filter((l) => l.id !== lectureId),
-        }
-      })
-    )
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, lectures: s.lectures.filter((l) => l.id !== lectureId), updatedAt: Date.now() }
+    }))
   }, [])
 
-  const reorderLectures = useCallback(
-    (subjectId: string, fromIndex: number, toIndex: number) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          const lectures = [...s.lectures].sort((a, b) => a.order - b.order)
-          const [moved] = lectures.splice(fromIndex, 1)
-          lectures.splice(toIndex, 0, moved)
-          return {
-            ...s,
-            lectures: lectures.map((l, i) => ({ ...l, order: i })),
-          }
-        })
-      )
-    },
-    []
-  )
+  const reorderLectures = useCallback((subjectId: string, fromIndex: number, toIndex: number) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      const lectures = [...s.lectures].sort((a, b) => a.order - b.order)
+      const [moved] = lectures.splice(fromIndex, 1)
+      lectures.splice(toIndex, 0, moved)
+      return {
+        ...s,
+        lectures: lectures.map((l, i) => ({ ...l, order: i })),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
-  const updateLectureStatus = useCallback(
-    (subjectId: string, lectureId: string, status: LectureStatus) => {
-      updateLecture(subjectId, lectureId, { status })
-    },
-    [updateLecture]
-  )
+  const updateLectureStatus = useCallback((subjectId: string, lectureId: string, status: LectureStatus) => {
+    updateLecture(subjectId, lectureId, { status })
+  }, [updateLecture])
 
-  const addTask = useCallback(
-    (subjectId: string, lectureId: string, task: Omit<Task, "id">) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            lectures: s.lectures.map((l) => {
-              if (l.id !== lectureId) return l
-              return {
-                ...l,
-                tasks: [...l.tasks, { ...task, id: generateId() }],
-              }
-            }),
-          }
-        })
-      )
-    },
-    []
-  )
+  const addTask = useCallback((subjectId: string, lectureId: string, task: Omit<Task, "id">) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return {
+        ...s,
+        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: [...l.tasks, { ...task, id: generateId() }] } : l),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
-  const toggleTask = useCallback(
-    (subjectId: string, lectureId: string, taskId: string) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            lectures: s.lectures.map((l) => {
-              if (l.id !== lectureId) return l
-              return {
-                ...l,
-                tasks: l.tasks.map((t) =>
-                  t.id === taskId ? { ...t, completed: !t.completed } : t
-                ),
-              }
-            }),
-          }
-        })
-      )
-    },
-    []
-  )
+  const toggleTask = useCallback((subjectId: string, lectureId: string, taskId: string) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return {
+        ...s,
+        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: l.tasks.map((t) => t.id === taskId ? { ...t, completed: !t.completed } : t) } : l),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
-  const deleteTask = useCallback(
-    (subjectId: string, lectureId: string, taskId: string) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            lectures: s.lectures.map((l) => {
-              if (l.id !== lectureId) return l
-              return {
-                ...l,
-                tasks: l.tasks.filter((t) => t.id !== taskId),
-              }
-            }),
-          }
-        })
-      )
-    },
-    []
-  )
+  const deleteTask = useCallback((subjectId: string, lectureId: string, taskId: string) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return {
+        ...s,
+        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: l.tasks.filter((t) => t.id !== taskId) } : l),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
-  const addResource = useCallback(
-    (subjectId: string, lectureId: string, resource: Omit<Resource, "id">) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            lectures: s.lectures.map((l) => {
-              if (l.id !== lectureId) return l
-              return {
-                ...l,
-                resources: [...l.resources, { ...resource, id: generateId() }],
-              }
-            }),
-          }
-        })
-      )
-    },
-    []
-  )
+  const addResource = useCallback((subjectId: string, lectureId: string, resource: Omit<Resource, "id">) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return {
+        ...s,
+        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, resources: [...l.resources, { ...resource, id: generateId() }] } : l),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
-  const deleteResource = useCallback(
-    (subjectId: string, lectureId: string, resourceId: string) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            lectures: s.lectures.map((l) => {
-              if (l.id !== lectureId) return l
-              return {
-                ...l,
-                resources: l.resources.filter((r) => r.id !== resourceId),
-              }
-            }),
-          }
-        })
-      )
-    },
-    []
-  )
+  const deleteResource = useCallback((subjectId: string, lectureId: string, resourceId: string) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return {
+        ...s,
+        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, resources: l.resources.filter((r) => r.id !== resourceId) } : l),
+        updatedAt: Date.now()
+      }
+    }))
+  }, [])
 
-  const addExam = useCallback(
-    (subjectId: string, exam: Omit<Exam, "id">) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            exams: [...s.exams, { ...exam, id: generateId() }],
-          }
-        })
-      )
-    },
-    []
-  )
+  const addExam = useCallback((subjectId: string, exam: Omit<Exam, "id">) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, exams: [...s.exams, { ...exam, id: generateId() }], updatedAt: Date.now() }
+    }))
+  }, [])
 
-  const updateExam = useCallback(
-    (subjectId: string, examId: string, data: Partial<Exam>) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            exams: s.exams.map((e) =>
-              e.id === examId ? { ...e, ...data } : e
-            ),
-          }
-        })
-      )
-    },
-    []
-  )
+  const updateExam = useCallback((subjectId: string, examId: string, data: Partial<Exam>) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, exams: s.exams.map((e) => e.id === examId ? { ...e, ...data } : e), updatedAt: Date.now() }
+    }))
+  }, [])
 
   const deleteExam = useCallback((subjectId: string, examId: string) => {
-    setSubjects((prev) =>
-      prev.map((s) => {
-        if (s.id !== subjectId) return s
-        return {
-          ...s,
-          exams: s.exams.filter((e) => e.id !== examId),
-        }
-      })
-    )
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, exams: s.exams.filter((e) => e.id !== examId), updatedAt: Date.now() }
+    }))
   }, [])
 
-  const addSchedule = useCallback(
-    (subjectId: string, schedule: Omit<Schedule, "id">) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            schedules: [...s.schedules, { ...schedule, id: generateId() }],
-          }
-        })
-      )
-    },
-    []
-  )
+  const addSchedule = useCallback((subjectId: string, schedule: Omit<Schedule, "id">) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, schedules: [...s.schedules, { ...schedule, id: generateId() }], updatedAt: Date.now() }
+    }))
+  }, [])
 
-  const updateSchedule = useCallback(
-    (subjectId: string, scheduleId: string, data: Partial<Schedule>) => {
-      setSubjects((prev) =>
-        prev.map((s) => {
-          if (s.id !== subjectId) return s
-          return {
-            ...s,
-            schedules: s.schedules.map((sch) =>
-              sch.id === scheduleId ? { ...sch, ...data } : sch
-            ),
-          }
-        })
-      )
-    },
-    []
-  )
+  const updateSchedule = useCallback((subjectId: string, scheduleId: string, data: Partial<Schedule>) => {
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, schedules: s.schedules.map((sch) => sch.id === scheduleId ? { ...sch, ...data } : sch), updatedAt: Date.now() }
+    }))
+  }, [])
 
   const deleteSchedule = useCallback((subjectId: string, scheduleId: string) => {
-    setSubjects((prev) =>
-      prev.map((s) => {
-        if (s.id !== subjectId) return s
-        return {
-          ...s,
-          schedules: s.schedules.filter((sch) => sch.id !== scheduleId),
-        }
-      })
-    )
+    setSubjects((prev) => prev.map((s) => {
+      if (s.id !== subjectId) return s
+      return { ...s, schedules: s.schedules.filter((sch) => sch.id !== scheduleId), updatedAt: Date.now() }
+    }))
   }, [])
 
-  const getSubjectProgress = useCallback(
-    (subjectId: string): number => {
-      const subject = subjects.find((s) => s.id === subjectId)
-      if (!subject || subject.lectures.length === 0) return 0
-      const completed = subject.lectures.filter(
-        (l) => l.status === "completed"
-      ).length
-      return Math.round((completed / subject.lectures.length) * 100)
-    },
-    [subjects]
-  )
+  const getSubjectProgress = useCallback((subjectId: string): number => {
+    const subject = subjects.find((s) => s.id === subjectId)
+    if (!subject || subject.lectures.length === 0) return 0
+    const completed = subject.lectures.filter((l) => l.status === "completed").length
+    return Math.round((completed / subject.lectures.length) * 100)
+  }, [subjects])
+
+  // 🛡️ فلترة المواد المحذوفة قبل ما نبعتها لباقي أجزاء الموقع
+  const activeSubjects = subjects.filter(s => !s.isDeleted)
 
   return (
     <StudyContext.Provider
       value={{
-        subjects,
+        subjects: activeSubjects, // الموقع هيشوف بس المواد اللي مش محذوفة
         addSubject,
         updateSubject,
         deleteSubject,

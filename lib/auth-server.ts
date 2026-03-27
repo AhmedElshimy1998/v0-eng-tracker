@@ -1,7 +1,7 @@
 // مسار الملف: lib/auth-server.ts
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import legacyUsers from "@/lib/legacy-users.json" // 👈 استيراد خريطة المستخدمين
+import legacyUsers from "@/lib/legacy-users.json" 
 
 export async function auth() {
   const cookieStore = await cookies()
@@ -13,21 +13,23 @@ export async function auth() {
   
   const { data: { user } } = await supabase.auth.getUser()
   
-  // لو مفيش مستخدم مسجل دخول
   if (!user) {
-    return { userId: null, userEmail: null }
+    return { userId: null, userEmail: null, isOnboarded: false }
   }
 
-  // 🔄 السحر بتاعك هنا: التحويل الذكي للـ ID
   const userEmail = user.email!;
   const userMap = legacyUsers as Record<string, string>;
   
-  // لو الإيميل موجود في الخريطة، استخدم الـ ID القديم (Clerk)
-  // لو مش موجود (طالب جديد)، استخدم الـ ID الجديد (Supabase)
   const resolvedUserId = userMap[userEmail] || user.id;
 
+  // 🛡️ تحديد حالة المستخدم:
+  // لو موجود في الجيسون (طالب مهاجر) -> يبقى أكيد Onboarded (قديم)
+  // لو جديد -> بنشوف الـ metadata بتاعته في سوبابيس
+  const isOnboarded = !!userMap[userEmail] || !!user.user_metadata?.onboarded;
+
   return { 
-    userId: resolvedUserId, // 👈 كل دوال المشروع هتاخد ده وتشتغل بيه فوراً!
-    userEmail: userEmail 
+    userId: resolvedUserId,
+    userEmail: userEmail,
+    isOnboarded // 👈 الميزة الجديدة اللي هتحمينا من مسح الداتا
   }
 }
