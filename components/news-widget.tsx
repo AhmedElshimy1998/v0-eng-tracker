@@ -1,16 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { getNews, NewsItem, NewsType } from "@/lib/newsActions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Loader2, Newspaper, Pin, AlertTriangle, GraduationCap, Bell, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useSmartNews } from "@/hooks/useSmartNews" // 🚀 استدعاء الهوك السحري
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
-const TYPE_CONFIG: Record<NewsType, { label: string; icon: React.ReactNode; className: string }> = {
+const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
   general: {
     label: "إشعار عام",
     icon: <Bell className="h-3 w-3" />,
@@ -28,55 +27,64 @@ const TYPE_CONFIG: Record<NewsType, { label: string; icon: React.ReactNode; clas
   },
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("ar-EG", {
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat("ar-EG", {
     month: "short",
     day: "numeric",
-  })
+  }).format(date)
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
-
 export function NewsWidget() {
-  const [news, setNews]     = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(true)
+  // 🚀 السحر هنا: بنقول للهوك إحنا "الكارد"، فبيعتمد على الكاش لمدة ساعة (أو بياخد الفريش من الصفحة)
+  const { news, isLoading } = useSmartNews("card")
 
-  useEffect(() => {
-    getNews().then((data) => {
-      setNews(data.slice(0, 3))   // أحدث 3 أخبار بس في الـ widget
-      setLoading(false)
-    })
-  }, [])
+  // ترتيب الأخبار: المثبت أولاً، ثم الأحدث
+  const sortedNews = [...news].sort((a: any, b: any) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  // عرض آخر 4 أخبار فقط داخل الكارد (عشان نحافظ على شكل الداشبورد)
+  const displayNews = sortedNews.slice(0, 4);
 
   return (
-    <Card dir="rtl">
-      <CardHeader className="pb-3 flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Newspaper className="h-5 w-5" />
-          آخر الأخبار
-        </CardTitle>
-        <Link href="/news">
-          <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+    <Card className="flex flex-col h-full border-muted-foreground/20 shadow-sm hover:shadow-md transition-shadow">
+      <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-primary/10 rounded-md">
+            <Newspaper className="h-4 w-4 text-primary" />
+          </div>
+          <CardTitle className="text-lg">أحدث الإشعارات</CardTitle>
+        </div>
+        <Link href="/student/news">
+          <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground hover:text-primary">
             عرض الكل
             <ArrowLeft className="h-3 w-3" />
           </Button>
         </Link>
       </CardHeader>
 
-      <CardContent className="space-y-3">
-        {loading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
+      <CardContent className="p-3 flex-1 flex flex-col gap-2 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-8 space-y-3">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">جاري التحديث...</p>
           </div>
-        ) : news.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            لا توجد أخبار حالياً
-          </p>
+        ) : displayNews.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-8 text-center px-4 border-2 border-dashed rounded-lg border-muted">
+            <Bell className="h-8 w-8 text-muted-foreground/30 mb-2" />
+            <p className="text-sm font-medium text-muted-foreground">لا توجد إشعارات حالياً</p>
+          </div>
         ) : (
-          news.map((item) => {
-            const config = TYPE_CONFIG[item.type]
+          displayNews.map((item) => {
+            const config = TYPE_CONFIG[item.type as keyof typeof TYPE_CONFIG] || TYPE_CONFIG.general
+            
             return (
-              <Link key={item.id} href="/news">
+              <Link key={item.id} href={`/student/news`}>
                 <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 hover:bg-accent transition-colors cursor-pointer">
                   {/* Icon */}
                   <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${config.className}`}>

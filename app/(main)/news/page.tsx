@@ -1,153 +1,106 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { getNews, NewsItem, NewsType } from "@/lib/newsActions"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, Newspaper, Pin, AlertTriangle, GraduationCap, Bell } from "lucide-react"
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-const TYPE_CONFIG: Record<NewsType, {
-  label: string
-  icon: React.ReactNode
-  cardClass: string
-  badgeClass: string
-}> = {
-  general: {
-    label: "إشعار عام",
-    icon: <Bell className="h-4 w-4" />,
-    cardClass: "border-blue-500/30 bg-blue-500/5",
-    badgeClass: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  },
-  exam: {
-    label: "جدول امتحانات",
-    icon: <GraduationCap className="h-4 w-4" />,
-    cardClass: "border-orange-500/30 bg-orange-500/5",
-    badgeClass: "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  },
-  warning: {
-    label: "تنبيه مهم",
-    icon: <AlertTriangle className="h-4 w-4" />,
-    cardClass: "border-red-500/30 bg-red-500/5",
-    badgeClass: "bg-red-500/10 text-red-500 border-red-500/20",
-  },
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("ar-EG", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-// ─── Component ─────────────────────────────────────────────────────────────────
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { BellRing, CalendarDays, Loader2, BookOpen } from "lucide-react";
+import { useSmartNews } from "@/hooks/useSmartNews"; // 🚀 استدعاء الهوك الجديد
 
 export default function NewsPage() {
-  const [news, setNews] = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<NewsType | "all">("all")
+  // 🚀 سطر واحد جاب الداتا، وحط حالة التحميل، وطبق نظام الكاش (5 دقايق للصفحة)
+  const { news, isLoading } = useSmartNews("page");
 
-  useEffect(() => {
-    getNews().then((data) => {
-      setNews(data)
-      setLoading(false)
-    })
-  }, [])
+  // ترتيب الأخبار من الأحدث للأقدم (عشان لو مش مترتبة من السيرفر)
+  const sortedNews = [...news].sort((a: any, b: any) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
-  const filtered = filter === "all" ? news : news.filter((n) => n.type === filter)
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-24 gap-4">
-        <Loader2 className="animate-spin h-8 w-8 text-primary" />
-        <p className="text-muted-foreground text-lg">جاري تحميل الأخبار...</p>
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground animate-pulse">جاري جلب أحدث الأخبار...</p>
       </div>
-    )
+    );
+  }
+
+  if (news.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center px-4">
+        <div className="bg-muted w-20 h-20 rounded-full flex items-center justify-center mb-4">
+          <BellRing className="h-10 w-10 text-muted-foreground opacity-50" />
+        </div>
+        <h2 className="text-2xl font-bold">لا توجد أخبار حالياً</h2>
+        <p className="text-muted-foreground max-w-md">
+          لم تقم الإدارة بنشر أي إشعارات أو أخبار جديدة حتى الآن. يرجى العودة لاحقاً.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6" dir="rtl">
-
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Newspaper className="h-8 w-8 text-primary" />
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">الأخبار والإشعارات</h2>
-          <p className="text-muted-foreground">آخر الأخبار والإعلانات الهامة من الإدارة</p>
+    <div className="flex-1 space-y-8 p-4 md:p-8 max-w-5xl mx-auto w-full">
+      {/* رأس الصفحة */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center justify-center p-2 bg-primary/10 rounded-lg mb-2">
+            <BookOpen className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">لوحة الإعلانات والأخبار</h1>
+          <p className="text-muted-foreground text-lg">
+            تابع أحدث القرارات، الجداول، والإشعارات الأكاديمية الهامة.
+          </p>
         </div>
+        <Badge variant="secondary" className="w-fit text-sm px-3 py-1">
+          {news.length} إعلانات
+        </Badge>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex flex-wrap gap-2">
-        {(["all", "general", "exam", "warning"] as const).map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilter(type)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
-              filter === type
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-background text-muted-foreground border-input hover:border-primary/50"
-            }`}
-          >
-            {type === "all" ? "الكل" : TYPE_CONFIG[type].label}
-            <span className="mr-2 opacity-60">
-              ({type === "all" ? news.length : news.filter((n) => n.type === type).length})
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* قائمة الأخبار */}
+      <div className="grid gap-6">
+        {sortedNews.map((item) => {
+          // تنسيق التاريخ والوقت
+          const dateObj = new Date(item.createdAt);
+          const formattedDate = dateObj.toLocaleDateString("ar-EG", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          });
+          const formattedTime = dateObj.toLocaleTimeString("ar-EG", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
 
-      {/* News list */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-4 border rounded-lg border-dashed">
-          <Newspaper className="h-12 w-12 opacity-30" />
-          <p className="text-lg">لا توجد أخبار حالياً</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((item) => {
-            const config = TYPE_CONFIG[item.type]
-            return (
-              <Card
-                key={item.id}
-                className={`transition-all ${config.cardClass} ${
-                  item.pinned ? "ring-1 ring-primary/30" : ""
-                }`}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {item.pinned && (
-                        <Badge className="bg-primary/10 text-primary border-primary/20 gap-1">
-                          <Pin className="h-3 w-3" />
-                          مثبت
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className={`gap-1 ${config.badgeClass}`}>
-                        {config.icon}
-                        {config.label}
-                      </Badge>
+          return (
+            <Card key={item.id} className="overflow-hidden hover:border-primary/50 transition-colors group">
+              <CardHeader className={`${item.type === 'alert' ? 'bg-red-500/5 pb-4' : item.type === 'event' ? 'bg-blue-500/5 pb-4' : 'bg-muted/30 pb-4'}`}>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl md:text-2xl leading-relaxed">
+                      {item.title}
+                    </CardTitle>
+                    <div className="flex items-center text-sm text-muted-foreground pt-1">
+                      <CalendarDays className="h-4 w-4 mr-1 ml-2 inline" />
+                      <span>{formattedDate} - {formattedTime}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(item.createdAt)}
-                    </span>
                   </div>
-                  <CardTitle className="text-xl mt-2">{item.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {item.body}
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+                  <Badge 
+                    variant={item.type === 'alert' ? "destructive" : item.type === 'event' ? "default" : "secondary"}
+                    className="shrink-0"
+                  >
+                    {item.type === 'alert' ? 'هام جداً' : item.type === 'event' ? 'فعالية' : 'إعلان عام'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <CardDescription className="text-base md:text-lg text-foreground leading-loose whitespace-pre-wrap">
+                  {item.content}
+                </CardDescription>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
-  )
+  );
 }
