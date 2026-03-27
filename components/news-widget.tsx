@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Loader2, Newspaper, Pin, AlertTriangle, GraduationCap, Bell, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useSmartNews } from "@/hooks/useSmartNews"
+
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -38,16 +40,9 @@ function formatDate(iso: string) {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function NewsWidget() {
-  const [news, setNews]     = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    getNews().then((data) => {
-      setNews(data.slice(0, 3))   // أحدث 3 أخبار بس في الـ widget
-      setLoading(false)
-    })
-  }, [])
 
+const { news, isLoading: loading } = useSmartNews("card");
   return (
     <Card dir="rtl">
       <CardHeader className="pb-3 flex flex-row items-center justify-between">

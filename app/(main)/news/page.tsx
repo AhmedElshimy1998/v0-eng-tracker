@@ -5,6 +5,7 @@ import { getNews, NewsItem, NewsType } from "@/lib/newsActions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Newspaper, Pin, AlertTriangle, GraduationCap, Bell } from "lucide-react"
+import { useSmartNews } from "@/hooks/useSmartNews"
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -47,16 +48,11 @@ function formatDate(iso: string): string {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewsPage() {
-  const [news, setNews] = useState<NewsItem[]>([])
-  const [loading, setLoading] = useState(true)
+
+  const { news, isLoading: loading } = useSmartNews("page");
   const [filter, setFilter] = useState<NewsType | "all">("all")
 
-  useEffect(() => {
-    getNews().then((data) => {
-      setNews(data)
-      setLoading(false)
-    })
-  }, [])
+
 
   const filtered = filter === "all" ? news : news.filter((n) => n.type === filter)
 
