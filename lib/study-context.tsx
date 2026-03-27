@@ -46,28 +46,61 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         const localStr = localStorage.getItem("studyhub-local-data");
         const localData: Subject[] = localStr ? JSON.parse(localStr) : [];
         
+        // 1. اعرض الداتا المحلي فوراً واقفل شاشة التحميل
+        if (localData.length > 0 && mounted) {
+          setSubjects(localData);
+          setIsLoading(false); 
+        }
+
         if (!navigator.onLine) {
-          if (mounted) setSubjects(localData);
+          if (mounted) {
+            setIsInitialized(true);
+            setIsLoading(false);
+          }
           return;
         }
 
+        // 🛑 التعديل السحري: درع حماية السيرفر من الريفريش (Cooldown) 🛑
+        const lastSyncStr = localStorage.getItem("studyhub-last-sync-time");
+        const lastSyncTime = lastSyncStr ? parseInt(lastSyncStr) : 0;
+        const TEN_MINUTES = 10 * 60 * 1000; // 10 دقايق
+        const needsSync = localStorage.getItem("needs-sync") === "true";
+
+        // لو مفيش داتا محتاجة تترفع، ولسه معدهاش 10 دقايق على آخر مزامنة
+        if (!needsSync && localData.length > 0 && (Date.now() - lastSyncTime < TEN_MINUTES)) {
+          console.log("⚡ تم الاعتماد كلياً على الذاكرة المحلية (لا يوجد اتصال بالسيرفر)");
+          if (mounted) {
+            setIsInitialized(true);
+            setIsLoading(false);
+          }
+          return; // إعمل Return فوراً ومتكلمش Upstash خالص!
+        }
+
+        // 🔄 لو عدى 10 دقايق، أو دي أول مرة، نكلم السيرفر
         const cloudResponse = await getCloudData();
         
         if (!cloudResponse) {
-          if (mounted) setSubjects(localData);
+          if (mounted) {
+            setIsInitialized(true);
+            setIsLoading(false);
+          }
           return;
         }
 
         const { subjects: cloudData, isNewUser } = cloudResponse;
 
-        // حالة الزيرو الحقيقية
+        // ⏱️ نختم بوقت المزامنة الجديد عشان نحمي السيرفر الـ 10 دقايق الجايين
+        localStorage.setItem("studyhub-last-sync-time", Date.now().toString());
+
         if (isNewUser && cloudData.length === 0 && localData.length === 0) {
           const initialMock = mockSubjects.map(s => ({ ...s, updatedAt: Date.now() }));
-          if (mounted) setSubjects(initialMock);
+          if (mounted) {
+            setSubjects(initialMock);
+            setIsLoading(false);
+          }
           localStorage.setItem("studyhub-local-data", JSON.stringify(initialMock));
           await saveCloudData(initialMock);
         } else {
-          // دمج ذكي بدون فزلكة
           const mergedMap = new Map<string, Subject>();
           if (Array.isArray(cloudData)) {
             cloudData.forEach(s => mergedMap.set(s.id, s));
@@ -83,7 +116,10 @@ export function StudyProvider({ children }: { children: ReactNode }) {
           });
 
           const finalData = Array.from(mergedMap.values());
-          if (mounted) setSubjects(finalData);
+          if (mounted) {
+            setSubjects(finalData);
+            setIsLoading(false);
+          }
           localStorage.setItem("studyhub-local-data", JSON.stringify(finalData));
           
           if (hasLocalUpdates) {
@@ -95,7 +131,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       } finally {
         if (mounted) {
           setIsInitialized(true);
-          setIsLoading(false);
+          setIsLoading(false); 
         }
       }
     }
@@ -104,22 +140,29 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false };
   }, []);
 
-  // 2. محرك الحفظ الصارم (الآن هيشتغل فوراً مع أي تعديل)
-  useEffect(() => {
-    if (!isInitialized) return;
+  // ضيف ده فوق مع تعريفات الـ state
+  const isInitialLoad = React.useRef(true);
 
-    localStorage.setItem("studyhub-local-data", JSON.stringify(subjects));
-    
-    if (navigator.onLine) {
-      saveCloudData(subjects).then(res => {
-        localStorage.setItem("needs-sync", res && res.success ? "false" : "true");
-      }).catch(() => {
-        localStorage.setItem("needs-sync", "true");
-      });
-    } else {
-      localStorage.setItem("needs-sync", "true");
+  // 2. محرك الحفظ الذكي (معدل لمنع الحفظ بعد الريفريش مباشرة)
+  useEffect(() => {
+    // لو دي أول رصة داتا جاية من التحميل، متعملش حفظ، وافتح القفل بس
+    if (isInitialLoad.current && subjects.length > 0) {
+      isInitialLoad.current = false;
+      return; 
     }
-  }, [subjects, isInitialized]);
+
+    if (isInitialized && subjects.length > 0) {
+      localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
+      
+      if (navigator.onLine) {
+        saveCloudData(subjects).catch(() => {
+          localStorage.setItem("needs-sync", "true")
+        })
+      } else {
+        localStorage.setItem("needs-sync", "true")
+      }
+    }
+  }, [subjects, isInitialized])
 
   // 3. مراقب الإنترنت
   useEffect(() => {
