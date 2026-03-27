@@ -1,8 +1,7 @@
-// مسار الملف: proxy.ts (أو middleware.ts)
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
   let response = NextResponse.next({ request: req })
 
   const supabase = createServerClient(
@@ -22,7 +21,6 @@ export async function middleware(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // نفس مساراتك العامة بالظبط
   const isPublicPattern = /^\/(?:sign-in|sign-up|api|news|icon|logo|manifest\.json|sw\.js|auth|$)/;
   const isPublic = isPublicPattern.test(req.nextUrl.pathname);
   const isHomePage = req.nextUrl.pathname === '/';
