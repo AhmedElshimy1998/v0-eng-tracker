@@ -1,31 +1,35 @@
 "use server"
 
 import { kv } from "@vercel/kv"
-import { auth } from "@/lib/auth-server" // تأكد من المسار
+import { auth } from "@/lib/auth-server"
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { AcademicProfile } from "./academicActions"
+import legacyUsers from "@/lib/legacy-users.json" // 👈 ضفنا ملف الخريطة هنا
 
-// دالة مساعدة لإنشاء عميل Supabase بصلاحيات الإدمن (Service Role)
-// ⚠️ ملاحظة مهمة: هتحتاج تضيف المفتاح ده في ملف .env.local
 const getSupabaseAdmin = async () => {
   const cookieStore = await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!, // مفتاح الإدمن السري
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { cookies: { getAll() { return cookieStore.getAll() } } }
   )
 }
 
-// 1. فحص هل المستخدم الحالي أدمن؟
+// 🪄 السحر هنا: دالة بتحول الـ ID الجديد للقديم عشان الإدمن يشوف الداتا الصح
+const getResolvedId = (email: string | undefined, currentId: string) => {
+  if (!email) return currentId;
+  const userMap = legacyUsers as Record<string, string>;
+  return userMap[email] || currentId;
+}
+
 export async function checkIsAdmin(): Promise<boolean> {
   try {
-    const { userId } = await auth();
+    const { userId } = await auth(); 
     if (!userId) return false;
 
     let admins = await kv.get<string[]>('site-admins');
     
-    // لو مفيش أي أدمن في الموقع خالص، أول واحد يدخل هيبقى هو الأدمن الرئيسي (عشانك إنت)
     if (!admins || admins.length === 0) {
       admins = [userId];
       await kv.set('site-admins', admins);
@@ -38,7 +42,6 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 }
 
-// 2. جلب كل الطلاب المسجلين (متضمنة النوتس من الداتا بيز)
 export async function getAllStudents() {
   try {
     const isAdmin = await checkIsAdmin();
@@ -46,7 +49,6 @@ export async function getAllStudents() {
 
     const supabaseAdmin = await getSupabaseAdmin();
     
-    // جلب قائمة المستخدمين من Supabase (يعادل clerkClient.users.getUserList)
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 500
@@ -56,20 +58,19 @@ export async function getAllStudents() {
 
     const studentsData = await Promise.all(
       users.map(async (user) => {
-        const profile = await kv.get<AcademicProfile>(`academic-profile-${user.id}`);
-        // جلب النوتس المحفوظة من الداتا بيز
-        const advisingNotes = await kv.get<string>(`advising-notes-${user.id}`) || ""; 
-        
-        // محاولة استخراج الاسم من البيانات الوصفية أو استخدام الإيميل
-        const fallbackName = user.user_metadata?.full_name || user.email || "مستخدم بدون اسم";
-        const fallbackPhone = user.phone || "لا يوجد هاتف";
+        // 🔄 قراءة الـ ID القديم (لو موجود) بدل الجديد
+        const resolvedId = getResolvedId(user.email, user.id);
 
+        // 📥 جلب الداتا باستخدام الـ ID الصح
+        const profile = await kv.get<AcademicProfile>(`academic-profile-${resolvedId}`);
+        const advisingNotes = await kv.get<string>(`advising-notes-${resolvedId}`) || ""; 
+        
         return {
-          userId: user.id,
-          advisingNotes, // إرسال النوتس للشاشة
+          userId: user.id, // بنبعت الآي دي بتاع سوبابيس للواجهة عشان الحذف والتعديل يشتغل صح
+          advisingNotes,
           profile: {
-            name: profile?.name || fallbackName,
-            phone: profile?.phone || fallbackPhone,
+            name: profile?.name || user.user_metadata?.full_name || user.email || "مستخدم بدون اسم",
+            phone: profile?.phone || user.phone || "لا يوجد هاتف",
             department: profile?.department || "لم يكمل الإعدادات",
             semesters: profile?.semesters || []
           }
@@ -84,18 +85,21 @@ export async function getAllStudents() {
   }
 }
 
-// 3. إدارة الأدمنز (إضافة/إزالة)
 export async function toggleAdminStatus(targetUserId: string, makeAdmin: boolean) {
   try {
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("Unauthorized");
 
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+    const resolvedId = getResolvedId(user?.email, targetUserId);
+
     let admins = await kv.get<string[]>('site-admins') || [];
     
-    if (makeAdmin && !admins.includes(targetUserId)) {
-      admins.push(targetUserId);
+    if (makeAdmin && !admins.includes(resolvedId)) {
+      admins.push(resolvedId);
     } else if (!makeAdmin) {
-      admins = admins.filter(id => id !== targetUserId);
+      admins = admins.filter(id => id !== resolvedId);
     }
 
     await kv.set('site-admins', admins);
@@ -105,7 +109,6 @@ export async function toggleAdminStatus(targetUserId: string, makeAdmin: boolean
   }
 }
 
-// 4. جلب قائمة الـ IDs الخاصة بالمديرين
 export async function getSiteAdmins(): Promise<string[]> {
   try {
     return await kv.get<string[]>('site-admins') || [];
@@ -114,65 +117,67 @@ export async function getSiteAdmins(): Promise<string[]> {
   }
 }
 
-// 5. الحذف النهائي للمستخدم (من Supabase ومن Upstash)
 export async function deleteUserAccount(targetUserId: string) {
   try {
-    // 1. فحص صلاحيات الإدمن قبل البدء
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("غير مصرح لك بإجراء هذا التعديل");
 
-    // 2. الحذف من نظام التوثيق Supabase (عشان يقفل حسابه تماماً)
     const supabaseAdmin = await getSupabaseAdmin();
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
     
+    // نجيب بيانات المستخدم عشان نعرف إيميله والـ ID القديم قبل الحذف
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+    const resolvedId = getResolvedId(user?.email, targetUserId);
+
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
     if (deleteError) throw deleteError;
 
-    // 3. مسح كافة السجلات المرتبطة بالـ ID في Upstash KV
+    // الحذف من الداتا بيز بيتم بناءً على الـ ID الصح
     await Promise.all([
-      kv.del(`academic-profile-${targetUserId}`),
-      kv.del(`student_records:${targetUserId}`),
-      kv.del(`studyhub-cloud-data-${targetUserId}`),
-      kv.del(`push-subscriptions-${targetUserId}`),
-      kv.del(`advising-notes-${targetUserId}`),
-      kv.del(`last_ai_analysis:${targetUserId}`)
+      kv.del(`academic-profile-${resolvedId}`),
+      kv.del(`student_records:${resolvedId}`),
+      kv.del(`studyhub-cloud-data-${resolvedId}`),
+      kv.del(`push-subscriptions-${resolvedId}`),
+      kv.del(`advising-notes-${resolvedId}`),
+      kv.del(`last_ai_analysis:${resolvedId}`)
     ]);
 
-    // 4. إذا كان المستخدم مديراً، يتم حذفه من قائمة الـ Admins
     let admins = await kv.get<string[]>('site-admins') || [];
-    if (admins.includes(targetUserId)) {
-      admins = admins.filter(id => id !== targetUserId);
+    if (admins.includes(resolvedId)) {
+      admins = admins.filter(id => id !== resolvedId);
       await kv.set('site-admins', admins);
     }
 
-    console.log(`[Success] User ${targetUserId} and all associated data have been deleted.`);
     return { success: true };
-
   } catch (error: any) {
-    console.error("Error during full user deletion:", error);
-    return { 
-      success: false, 
-      error: error.message || "حدث خطأ غير متوقع أثناء عملية الحذف الشامل." 
-    };
+    return { success: false, error: error.message };
   }
 }
 
-// 6. جلب ملاحظات المرشد الأكاديمي لطالب معين
 export async function getAdvisingNotes(studentId: string): Promise<string> {
   try {
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) return "";
-    return await kv.get<string>(`advising-notes-${studentId}`) || "";
+
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(studentId);
+    const resolvedId = getResolvedId(user?.email, studentId);
+
+    return await kv.get<string>(`advising-notes-${resolvedId}`) || "";
   } catch (error) {
     return "";
   }
 }
 
-// 7. حفظ ملاحظات المرشد الأكاديمي
 export async function saveAdvisingNotes(studentId: string, notes: string) {
   try {
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("Unauthorized");
-    await kv.set(`advising-notes-${studentId}`, notes);
+
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(studentId);
+    const resolvedId = getResolvedId(user?.email, studentId);
+
+    await kv.set(`advising-notes-${resolvedId}`, notes);
     return { success: true };
   } catch (error) {
     return { success: false };
