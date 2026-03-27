@@ -1,6 +1,6 @@
 "use client"
 import { usePathname } from "next/navigation"
-import { ClerkProvider } from '@clerk/nextjs'
+import { ClerkProvider } from '@/lib/auth-client'
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "sonner"
 import { ProfileGuard } from "@/components/profile-guard";

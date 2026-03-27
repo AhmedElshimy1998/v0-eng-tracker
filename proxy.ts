@@ -1,49 +1,45 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse, NextRequest } from "next/server";
-// s
-// 1. حدد المسارات اللي "أي حد" يشوفها
-const isPublicRoute = createRouteMatcher([
-  '/', 
-    '/sign-in(.*)', 
-      '/sign-up(.*)', 
-        '/api(.*)',
-        '/news(.*)',
-        '/icon(.*)',
-        '/logo(.*)',
-        '/manifest.json', 
-        '/manifest.webmanifest',
-        '/sw.js',
-        '/workbox-(.*)'
-        ]);
+// مسار الملف: proxy.ts (أو middleware.ts)
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-        // 2. إعداد الـ Proxy (البديل للميدل وير)
-        const proxyHandler = clerkMiddleware(async (auth, req: NextRequest) => {
-          const { userId } = await auth();
-            const isPublic = isPublicRoute(req);
-              const isHomePage = req.nextUrl.pathname === '/';
+export async function middleware(req: NextRequest) {
+  let response = NextResponse.next({ request: req })
 
-                // حالة 1: مستخدم مش مسجل وبيحاول يدخل صفحة خاصة
-                  if (!userId && !isPublic) {
-                      return NextResponse.redirect(new URL('/', req.url));
-                        }
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return req.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
+          response = NextResponse.next({ request: req })
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+        },
+      },
+    }
+  )
 
-                          // حالة 2: مستخدم مسجل دخول وراح للرئيسية بالصدفة
-                            if (userId && isHomePage) {
-                                return NextResponse.redirect(new URL('/dashboard', req.url));
-                                  }
+  const { data: { user } } = await supabase.auth.getUser()
 
-                                    // حالة 3: أي حالة تانية سيبه يمر بسلام
-                                      return NextResponse.next();
-                                      });
+  // نفس مساراتك العامة بالظبط
+  const isPublicPattern = /^\/(?:sign-in|sign-up|api|news|icon|logo|manifest\.json|sw\.js|auth|$)/;
+  const isPublic = isPublicPattern.test(req.nextUrl.pathname);
+  const isHomePage = req.nextUrl.pathname === '/';
 
-                                      // تصدير البروكسي بالطريقة اللي بيقبلها Next.js 16
-                                      export default proxyHandler;
-                                      export { proxyHandler as proxy };
+  // حالة 1: مستخدم مش مسجل وبيحاول يدخل صفحة خاصة
+  if (!user && !isPublic) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
 
-                                      export const config = {
-                                        matcher: [
-                                            '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-                                                '/(api|trpc)(.*)',
-                                                  ],
-                                                  };
+  // حالة 2: مستخدم مسجل دخول وراح للرئيسية أو صفحة الدخول
+  if (user && (isHomePage || req.nextUrl.pathname.startsWith('/sign-in') || req.nextUrl.pathname.startsWith('/sign-up'))) {
+    return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
 
+  return response
+}
+
+export const config = {
+  matcher: ['/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)', '/(api|trpc)(.*)'],
+}

@@ -2,7 +2,7 @@
 
 import { kv } from "@vercel/kv"
 import { Subject } from "./types"
-import { auth } from "@clerk/nextjs/server" // إضافة مكتبة Clerk
+import { auth } from "@/lib/auth-server" // إضافة مكتبة Clerk
 
 // دالة لجلب البيانات من السحابة الخاصة بالمستخدم فقط
 export async function getCloudData() {

@@ -4,7 +4,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAcademicProfile } from "./academicActions"; // المصدر الوحيد للداتا
 import { coursesCatalog } from "./courses";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/auth-server";
 import { kv } from "@vercel/kv"; // الإضافة الجديدة للتحكم في الوقت
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);

@@ -1,8 +1,9 @@
 "use server"
 
 import { kv } from "@vercel/kv"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth-server"
 import { SemesterData } from "@/lib/types" 
+import legacyUsers from "@/lib/legacy-users.json"
 
 export interface AcademicProfile {
   name: string;

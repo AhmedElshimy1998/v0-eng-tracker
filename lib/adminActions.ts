@@ -1,8 +1,21 @@
 "use server"
 
 import { kv } from "@vercel/kv"
-import { auth, clerkClient } from "@clerk/nextjs/server"
+import { auth } from "@/lib/auth-server" // تأكد من المسار
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { AcademicProfile } from "./academicActions"
+
+// دالة مساعدة لإنشاء عميل Supabase بصلاحيات الإدمن (Service Role)
+// ⚠️ ملاحظة مهمة: هتحتاج تضيف المفتاح ده في ملف .env.local
+const getSupabaseAdmin = async () => {
+  const cookieStore = await cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!, // مفتاح الإدمن السري
+    { cookies: { getAll() { return cookieStore.getAll() } } }
+  )
+}
 
 // 1. فحص هل المستخدم الحالي أدمن؟
 export async function checkIsAdmin(): Promise<boolean> {
@@ -31,17 +44,25 @@ export async function getAllStudents() {
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("Unauthorized");
 
-    const client = await clerkClient();
-    const clerkUsers = await client.users.getUserList({ limit: 500 });
+    const supabaseAdmin = await getSupabaseAdmin();
+    
+    // جلب قائمة المستخدمين من Supabase (يعادل clerkClient.users.getUserList)
+    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 500
+    });
+
+    if (error) throw error;
 
     const studentsData = await Promise.all(
-      clerkUsers.data.map(async (user) => {
+      users.map(async (user) => {
         const profile = await kv.get<AcademicProfile>(`academic-profile-${user.id}`);
         // جلب النوتس المحفوظة من الداتا بيز
         const advisingNotes = await kv.get<string>(`advising-notes-${user.id}`) || ""; 
         
-        const fallbackName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.emailAddresses[0]?.emailAddress || "مستخدم بدون اسم";
-        const fallbackPhone = user.phoneNumbers[0]?.phoneNumber || "لا يوجد هاتف";
+        // محاولة استخراج الاسم من البيانات الوصفية أو استخدام الإيميل
+        const fallbackName = user.user_metadata?.full_name || user.email || "مستخدم بدون اسم";
+        const fallbackPhone = user.phone || "لا يوجد هاتف";
 
         return {
           userId: user.id,
@@ -93,26 +114,27 @@ export async function getSiteAdmins(): Promise<string[]> {
   }
 }
 
-// 5. الحذف النهائي للمستخدم (من Clerk ومن Upstash)
+// 5. الحذف النهائي للمستخدم (من Supabase ومن Upstash)
 export async function deleteUserAccount(targetUserId: string) {
   try {
     // 1. فحص صلاحيات الإدمن قبل البدء
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("غير مصرح لك بإجراء هذا التعديل");
 
-    // 2. الحذف من نظام التوثيق Clerk (عشان يقفل حسابه تماماً)
-    const client = await clerkClient();
-    await client.users.deleteUser(targetUserId);
+    // 2. الحذف من نظام التوثيق Supabase (عشان يقفل حسابه تماماً)
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId);
+    
+    if (deleteError) throw deleteError;
 
     // 3. مسح كافة السجلات المرتبطة بالـ ID في Upstash KV
-    // تم تجميع كافة المفاتيح التي اكتشفناها لضمان الحذف الكامل
     await Promise.all([
-      kv.del(`academic-profile-${targetUserId}`),    // البروفايل والأترام
-      kv.del(`student_records:${targetUserId}`),     // سجل الدرجات التاريخي (كان ناقصاً)
-      kv.del(`studyhub-cloud-data-${targetUserId}`), // داتا الـ Tracker والمذاكرة
-      kv.del(`push-subscriptions-${targetUserId}`),  // اشتراكات الإشعارات
-      kv.del(`advising-notes-${targetUserId}`),      // ملاحظات الإرشاد الأكاديمي
-      kv.del(`last_ai_analysis:${targetUserId}`)     // توقيت تحليل الـ AI (لتصفير العداد)
+      kv.del(`academic-profile-${targetUserId}`),
+      kv.del(`student_records:${targetUserId}`),
+      kv.del(`studyhub-cloud-data-${targetUserId}`),
+      kv.del(`push-subscriptions-${targetUserId}`),
+      kv.del(`advising-notes-${targetUserId}`),
+      kv.del(`last_ai_analysis:${targetUserId}`)
     ]);
 
     // 4. إذا كان المستخدم مديراً، يتم حذفه من قائمة الـ Admins

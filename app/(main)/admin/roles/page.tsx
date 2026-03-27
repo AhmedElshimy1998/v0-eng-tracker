@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ShieldCheck, UserX, Search, Filter } from "lucide-react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/lib/auth-client";
 import { Input } from "@/components/ui/input";
 
 import { getAllStudents, toggleAdminStatus, getSiteAdmins, deleteUserAccount } from "@/lib/adminActions";
