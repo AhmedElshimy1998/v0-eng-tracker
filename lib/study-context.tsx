@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react"
 import { Subject, Lecture, Exam, Task, Resource, LectureStatus, Schedule } from "./types"
 import { mockSubjects } from "./mock-data"
-// 🚨 تأكد إنك ضفت markAsOnboarded في الـ import من ملف actions
 import { getCloudData, saveCloudData, markAsOnboarded } from "./actions"
 
 interface StudyContextType {
@@ -34,92 +33,76 @@ interface StudyContextType {
 const StudyContext = createContext<StudyContextType | undefined>(undefined)
 
 export function StudyProvider({ children }: { children: ReactNode }) {
-  // الـ State هنا بتحتفظ بكل المواد (حتى المحذوفة وهمياً عشان المزامنة)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // 1. جلب ومزامنة البيانات (الذكاء كله هنا)
+  // 1. جلب البيانات (الآن محمي بـ finally)
   useEffect(() => {
     async function loadData() {
-      const localDataStr = localStorage.getItem("studyhub-local-data")
-      const localSubjects: Subject[] = localDataStr ? JSON.parse(localDataStr) : []
-      
-      if (localDataStr) {
-        setSubjects(localSubjects)
-        setIsLoading(false)
-      }
+      try {
+        const localDataStr = localStorage.getItem("studyhub-local-data")
+        const localSubjects: Subject[] = localDataStr ? JSON.parse(localDataStr) : []
+        
+        if (localDataStr) {
+          setSubjects(localSubjects)
+        }
 
-      if (navigator.onLine) {
-        try {
+        if (navigator.onLine) {
           const cloudData = await getCloudData()
           
-          // حماية الـ Auth
-          if (cloudData === undefined) {
-            setIsLoading(false)
-            return
-          }
+          if (cloudData !== undefined) {
+            const { subjects: cloudSubjects, isNewUser } = cloudData
 
-          const { subjects: cloudSubjects, isNewUser } = cloudData
+            if (isNewUser && cloudSubjects.length === 0 && localSubjects.length === 0) {
+              const mockWithTime = mockSubjects.map(s => ({...s, updatedAt: Date.now()}))
+              setSubjects(mockWithTime)
+            } else {
+              const subjectMap = new Map<string, Subject>()
+              let needsCloudUpdate = false
 
-          if (isNewUser && localSubjects.length === 0) {
-            // مستخدم جديد زيرو: حط الـ Mock واختم بوقت دلوقتي
-            const mockWithTime = mockSubjects.map(s => ({...s, updatedAt: Date.now()}))
-            setSubjects(mockWithTime)
-            localStorage.setItem("studyhub-local-data", JSON.stringify(mockWithTime))
-          } else {
-            // 🧠 الدمج الذكي بناءً على الوقت (Timestamp Merge)
-            const subjectMap = new Map<string, Subject>()
-            let needsCloudUpdate = false
-
-            // أ- نحط داتا السيرفر الأول في الخريطة
-            if (Array.isArray(cloudSubjects)) {
-              cloudSubjects.forEach(s => subjectMap.set(s.id, s))
-            }
-
-            // ب- نلف على الداتا المحلية ونقارن
-            localSubjects.forEach(localSub => {
-              const cloudSub = subjectMap.get(localSub.id)
-              if (!cloudSub) {
-                // المادة اتعملت أوفلاين ولسه مترفعتش
-                subjectMap.set(localSub.id, localSub)
-                needsCloudUpdate = true
-              } else {
-                // المادة موجودة في الاتنين.. مين الأحدث؟
-                const localTime = localSub.updatedAt || 0
-                const cloudTime = cloudSub.updatedAt || 0
-                if (localTime > cloudTime) {
-                  subjectMap.set(localSub.id, localSub) // المحلي يكسب
-                  needsCloudUpdate = true
-                }
+              if (Array.isArray(cloudSubjects)) {
+                cloudSubjects.forEach(s => subjectMap.set(s.id, s))
               }
-            })
 
-            const finalMerged = Array.from(subjectMap.values())
-            setSubjects(finalMerged)
-            localStorage.setItem("studyhub-local-data", JSON.stringify(finalMerged))
+              localSubjects.forEach(localSub => {
+                const cloudSub = subjectMap.get(localSub.id)
+                if (!cloudSub) {
+                  subjectMap.set(localSub.id, localSub)
+                  needsCloudUpdate = true
+                } else {
+                  const localTime = localSub.updatedAt || 0
+                  const cloudTime = cloudSub.updatedAt || 0
+                  if (localTime > cloudTime) {
+                    subjectMap.set(localSub.id, localSub)
+                    needsCloudUpdate = true
+                  }
+                }
+              })
 
-            // لو الموبايل كان فيه تعديلات أحدث، ارفعها فوراً
-            if (needsCloudUpdate) {
-              saveCloudData(finalMerged).catch(() => localStorage.setItem("needs-sync", "true"))
+              const finalMerged = Array.from(subjectMap.values())
+              setSubjects(finalMerged)
+
+              if (needsCloudUpdate) {
+                saveCloudData(finalMerged).catch(() => localStorage.setItem("needs-sync", "true"))
+              }
             }
           }
-        } catch (error) {
-          console.log("Cloud fetch failed.")
         }
-      } else {
-        if (!localDataStr) setIsLoading(false)
+      } catch (error) {
+        console.error("Data load failed:", error)
+      } finally {
+        // 🚨 السر هنا: لازم نفك القفل عن السيستم دايماً عشان محرك الحفظ يشتغل!
+        setIsInitialized(true)
+        setIsLoading(false)
       }
-      
-      setIsInitialized(true)
-      setIsLoading(false)
     }
     loadData()
   }, [])
 
-  // 2. محرك الحفظ التلقائي
+  // 2. محرك الحفظ التلقائي (الآن بيحفظ فوراً بدون شروط معقدة)
   useEffect(() => {
-    if (isInitialized && subjects.length > 0) {
+    if (isInitialized) {
       localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
       
       if (navigator.onLine) {
@@ -145,11 +128,10 @@ export function StudyProvider({ children }: { children: ReactNode }) {
             const result = await saveCloudData(currentLocalData)
             if (result.success) {
               localStorage.setItem("needs-sync", "false")
-              console.log("✅ All devices synced successfully!")
             }
           }
         } catch(e) {
-          console.error("❌ Background sync failed.")
+          console.error("Sync failed")
         }
       }
     }
@@ -160,16 +142,12 @@ export function StudyProvider({ children }: { children: ReactNode }) {
 
   const generateId = () => Math.random().toString(36).substring(2, 9)
 
-  // ==========================================
-  // دوال التعديل (كلها بتحدث الـ updatedAt)
-  // ==========================================
-
   const addSubject = useCallback((subject: Omit<Subject, "id" | "lectures" | "exams" | "schedules">) => {
     setSubjects((prev) => [
       ...prev,
       { ...subject, id: generateId(), lectures: [], exams: [], schedules: [], updatedAt: Date.now() },
     ])
-    // 🎯 المستخدم ضاف مادة بجد؟ اختم باسبوره إنه مبقاش جديد
+    // نبلغ السيرفر إن المستخدم مابقاش جديد
     markAsOnboarded().catch(() => {});
   }, [])
 
@@ -180,7 +158,6 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteSubject = useCallback((id: string) => {
-    // 🗑️ الحذف الوهمي (Soft Delete): بنغير حالتها بدل ما نمسحها عشان السيرفر يعرف إنها اتحذفت
     setSubjects((prev) => 
       prev.map((s) => (s.id === id ? { ...s, isDeleted: true, updatedAt: Date.now() } : s))
     )
@@ -334,13 +311,13 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     return Math.round((completed / subject.lectures.length) * 100)
   }, [subjects])
 
-  // 🛡️ فلترة المواد المحذوفة قبل ما نبعتها لباقي أجزاء الموقع
+  // فلترة المواد المحذوفة
   const activeSubjects = subjects.filter(s => !s.isDeleted)
 
   return (
     <StudyContext.Provider
       value={{
-        subjects: activeSubjects, // الموقع هيشوف بس المواد اللي مش محذوفة
+        subjects: activeSubjects, 
         addSubject,
         updateSubject,
         deleteSubject,
