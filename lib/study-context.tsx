@@ -1,9 +1,9 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react"
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from "react"
 import { Subject, Lecture, Exam, Task, Resource, LectureStatus, Schedule } from "./types"
 import { mockSubjects } from "./mock-data"
-import { getCloudData, saveCloudData, markAsOnboarded } from "./actions"
+import { getCloudData, saveCloudData } from "./actions"
 
 interface StudyContextType {
   subjects: Subject[]
@@ -36,8 +36,10 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  
+  // 🛡️ درع جديد يمنع الحفظ التلقائي إنه يشتغل بالغلط أول ما الصفحة تفتح
+  const isFirstRender = useRef(true) 
 
-  // 1. جلب البيانات (الآن محمي بـ finally)
   useEffect(() => {
     async function loadData() {
       try {
@@ -51,71 +53,84 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         if (navigator.onLine) {
           const cloudData = await getCloudData()
           
-          if (cloudData !== undefined) {
-            const { subjects: cloudSubjects, isNewUser } = cloudData
+          if (cloudData === undefined) {
+            setIsLoading(false)
+            return // إياك تفك القفل لو مفيش اتصال
+          }
 
-            if (isNewUser && cloudSubjects.length === 0 && localSubjects.length === 0) {
-              const mockWithTime = mockSubjects.map(s => ({...s, updatedAt: Date.now()}))
-              setSubjects(mockWithTime)
-            } else {
-              const subjectMap = new Map<string, Subject>()
-              let needsCloudUpdate = false
+          const { subjects: cloudSubjects, isNewUser } = cloudData
 
-              if (Array.isArray(cloudSubjects)) {
-                cloudSubjects.forEach(s => subjectMap.set(s.id, s))
-              }
+          if (isNewUser && cloudSubjects.length === 0 && localSubjects.length === 0) {
+            const mockWithTime = mockSubjects.map(s => ({...s, updatedAt: Date.now()}))
+            setSubjects(mockWithTime)
+          } else {
+            const subjectMap = new Map<string, Subject>()
+            let needsCloudUpdate = false
 
-              localSubjects.forEach(localSub => {
-                const cloudSub = subjectMap.get(localSub.id)
-                if (!cloudSub) {
+            if (Array.isArray(cloudSubjects)) {
+              cloudSubjects.forEach(s => subjectMap.set(s.id, s))
+            }
+
+            localSubjects.forEach(localSub => {
+              const cloudSub = subjectMap.get(localSub.id)
+              if (!cloudSub) {
+                subjectMap.set(localSub.id, localSub)
+                needsCloudUpdate = true
+              } else {
+                const localTime = localSub.updatedAt || 0
+                const cloudTime = cloudSub.updatedAt || 0
+                if (localTime > cloudTime) {
                   subjectMap.set(localSub.id, localSub)
                   needsCloudUpdate = true
-                } else {
-                  const localTime = localSub.updatedAt || 0
-                  const cloudTime = cloudSub.updatedAt || 0
-                  if (localTime > cloudTime) {
-                    subjectMap.set(localSub.id, localSub)
-                    needsCloudUpdate = true
-                  }
                 }
-              })
-
-              const finalMerged = Array.from(subjectMap.values())
-              setSubjects(finalMerged)
-
-              if (needsCloudUpdate) {
-                saveCloudData(finalMerged).catch(() => localStorage.setItem("needs-sync", "true"))
               }
+            })
+
+            const finalMerged = Array.from(subjectMap.values())
+            setSubjects(finalMerged)
+
+            if (needsCloudUpdate) {
+              saveCloudData(finalMerged).catch(() => localStorage.setItem("needs-sync", "true"))
             }
           }
         }
-      } catch (error) {
-        console.error("Data load failed:", error)
-      } finally {
-        // 🚨 السر هنا: لازم نفك القفل عن السيستم دايماً عشان محرك الحفظ يشتغل!
         setIsInitialized(true)
+      } catch (error) {
+        setIsInitialized(true) 
+      } finally {
         setIsLoading(false)
       }
     }
     loadData()
   }, [])
 
-  // 2. محرك الحفظ التلقائي (الآن بيحفظ فوراً بدون شروط معقدة)
+  // ⚙️ محرك الحفظ التلقائي بعد إصلاح ثغرة الـ Refresh
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
-      
-      if (navigator.onLine) {
-        saveCloudData(subjects).catch(() => {
-          localStorage.setItem("needs-sync", "true")
-        })
-      } else {
-        localStorage.setItem("needs-sync", "true")
-      }
+    if (!isInitialized) return;
+
+    // الدرع ده بيخليه يتجاهل أول لفة، ويحفظ بس لما "إنت" تضيف أو تمسح حاجة
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    localStorage.setItem("studyhub-local-data", JSON.stringify(subjects))
+    
+    if (navigator.onLine) {
+      saveCloudData(subjects).then(res => {
+         // لو حصل إيرور في السيرفر هيكتب في الـ Console بدل ما يفشل في صمت
+         if (res && !res.success) {
+            console.error("⚠️ فشل الحفظ في السيرفر!");
+            localStorage.setItem("needs-sync", "true");
+         } else {
+            localStorage.setItem("needs-sync", "false");
+         }
+      }).catch(() => localStorage.setItem("needs-sync", "true"))
+    } else {
+      localStorage.setItem("needs-sync", "true")
     }
   }, [subjects, isInitialized])
 
-  // 3. مراقب عودة الإنترنت
   useEffect(() => {
     const handleOnline = async () => {
       const needsSync = localStorage.getItem("needs-sync")
@@ -123,62 +138,46 @@ export function StudyProvider({ children }: { children: ReactNode }) {
         try {
           const currentLocalDataStr = localStorage.getItem("studyhub-local-data")
           const currentLocalData = currentLocalDataStr ? JSON.parse(currentLocalDataStr) : []
-          
           if (currentLocalData.length > 0) {
             const result = await saveCloudData(currentLocalData)
-            if (result.success) {
-              localStorage.setItem("needs-sync", "false")
-            }
+            if (result.success) localStorage.setItem("needs-sync", "false")
           }
-        } catch(e) {
-          console.error("Sync failed")
-        }
+        } catch(e) {}
       }
     }
-
     window.addEventListener('online', handleOnline)
     return () => window.removeEventListener('online', handleOnline)
   }, [])
 
   const generateId = () => Math.random().toString(36).substring(2, 9)
 
+  // لاحظ هنا شيلنا دالة Onboarded اللي كانت بتعمل المشكلة
   const addSubject = useCallback((subject: Omit<Subject, "id" | "lectures" | "exams" | "schedules">) => {
     setSubjects((prev) => [
       ...prev,
       { ...subject, id: generateId(), lectures: [], exams: [], schedules: [], updatedAt: Date.now() },
     ])
-    // نبلغ السيرفر إن المستخدم مابقاش جديد
-    markAsOnboarded().catch(() => {});
   }, [])
 
   const updateSubject = useCallback((id: string, data: Partial<Subject>) => {
-    setSubjects((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...data, updatedAt: Date.now() } : s))
-    )
+    setSubjects((prev) => prev.map((s) => (s.id === id ? { ...s, ...data, updatedAt: Date.now() } : s)))
   }, [])
 
   const deleteSubject = useCallback((id: string) => {
-    setSubjects((prev) => 
-      prev.map((s) => (s.id === id ? { ...s, isDeleted: true, updatedAt: Date.now() } : s))
-    )
+    setSubjects((prev) => prev.map((s) => (s.id === id ? { ...s, isDeleted: true, updatedAt: Date.now() } : s)))
   }, [])
 
   const addLecture = useCallback((subjectId: string, lecture: Omit<Lecture, "id" | "order">) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      const newLecture: Lecture = { ...lecture, id: generateId(), order: s.lectures.length }
-      return { ...s, lectures: [...s.lectures, newLecture], updatedAt: Date.now() }
+      return { ...s, lectures: [...s.lectures, { ...lecture, id: generateId(), order: s.lectures.length }], updatedAt: Date.now() }
     }))
   }, [])
 
   const updateLecture = useCallback((subjectId: string, lectureId: string, data: Partial<Lecture>) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      return {
-        ...s,
-        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, ...data } : l),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, ...data } : l), updatedAt: Date.now() }
     }))
   }, [])
 
@@ -195,11 +194,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       const lectures = [...s.lectures].sort((a, b) => a.order - b.order)
       const [moved] = lectures.splice(fromIndex, 1)
       lectures.splice(toIndex, 0, moved)
-      return {
-        ...s,
-        lectures: lectures.map((l, i) => ({ ...l, order: i })),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: lectures.map((l, i) => ({ ...l, order: i })), updatedAt: Date.now() }
     }))
   }, [])
 
@@ -210,55 +205,35 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const addTask = useCallback((subjectId: string, lectureId: string, task: Omit<Task, "id">) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      return {
-        ...s,
-        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: [...l.tasks, { ...task, id: generateId() }] } : l),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: [...l.tasks, { ...task, id: generateId() }] } : l), updatedAt: Date.now() }
     }))
   }, [])
 
   const toggleTask = useCallback((subjectId: string, lectureId: string, taskId: string) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      return {
-        ...s,
-        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: l.tasks.map((t) => t.id === taskId ? { ...t, completed: !t.completed } : t) } : l),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: l.tasks.map((t) => t.id === taskId ? { ...t, completed: !t.completed } : t) } : l), updatedAt: Date.now() }
     }))
   }, [])
 
   const deleteTask = useCallback((subjectId: string, lectureId: string, taskId: string) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      return {
-        ...s,
-        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: l.tasks.filter((t) => t.id !== taskId) } : l),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, tasks: l.tasks.filter((t) => t.id !== taskId) } : l), updatedAt: Date.now() }
     }))
   }, [])
 
   const addResource = useCallback((subjectId: string, lectureId: string, resource: Omit<Resource, "id">) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      return {
-        ...s,
-        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, resources: [...l.resources, { ...resource, id: generateId() }] } : l),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, resources: [...l.resources, { ...resource, id: generateId() }] } : l), updatedAt: Date.now() }
     }))
   }, [])
 
   const deleteResource = useCallback((subjectId: string, lectureId: string, resourceId: string) => {
     setSubjects((prev) => prev.map((s) => {
       if (s.id !== subjectId) return s
-      return {
-        ...s,
-        lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, resources: l.resources.filter((r) => r.id !== resourceId) } : l),
-        updatedAt: Date.now()
-      }
+      return { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, resources: l.resources.filter((r) => r.id !== resourceId) } : l), updatedAt: Date.now() }
     }))
   }, [])
 
@@ -311,7 +286,6 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     return Math.round((completed / subject.lectures.length) * 100)
   }, [subjects])
 
-  // فلترة المواد المحذوفة
   const activeSubjects = subjects.filter(s => !s.isDeleted)
 
   return (

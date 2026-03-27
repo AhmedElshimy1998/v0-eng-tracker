@@ -1,35 +1,41 @@
 "use server"
 
 import { kv } from "@vercel/kv"
-import { Subject } from "./types" // تأكد إن المسار ده صح عندك
+import { Subject } from "./types"
 import { auth } from "@/lib/auth-server"
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 
-// دالة لجلب البيانات من السحابة ومعرفة هل المستخدم جديد؟
 export async function getCloudData() {
   try {
-    const { userId, isOnboarded } = await auth(); 
+    const { userId } = await auth(); 
     if (!userId) return undefined; 
 
-    const data = await kv.get<Subject[]>(`studyhub-cloud-data-${userId}`)
+    // 💡 بنسأل الداتا بيز: هل المستخدم ده رفع أي حاجة قبل كده؟
+    const isKnownUser = await kv.get(`user-onboarded-${userId}`);
+    const data = await kv.get<Subject[]>(`studyhub-cloud-data-${userId}`);
     
     return {
-      subjects: data || [], // لو الداتا فاضية نرجع مصفوفة
-      isNewUser: !isOnboarded // لو مش Onboarded يبقى جديد
+      subjects: data || [],
+      isNewUser: !isKnownUser // لو ملوش بصمة يبقى جديد
     };
   } catch (error) {
     return undefined;
   }
 }
 
-// دالة لحفظ البيانات في السحابة
 export async function saveCloudData(subjects: Subject[]) {
   try {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Unauthorized" };
 
+    // 1. حفظ المواد في السحابة
     await kv.set(`studyhub-cloud-data-${userId}`, subjects)
+
+    // 2. وضع بصمة للمستخدم عشان السيستم يعرف إنه مبقاش جديد
+    // البصمة دي سريعة جداً ومبتعملش مشاكل في الكوكيز
+    if (subjects.length > 0) {
+      await kv.set(`user-onboarded-${userId}`, true);
+    }
+
     return { success: true }
   } catch (error) {
     console.error("Failed to save to cloud:", error)
@@ -37,26 +43,6 @@ export async function saveCloudData(subjects: Subject[]) {
   }
 }
 
-// 🎯 الدالة الجديدة: بتختم على باسبور المستخدم في سوبابيس إنه مبقاش جديد
-export async function markAsOnboarded() {
-  try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll() { return cookieStore.getAll() } } }
-    )
-    
-    await supabase.auth.updateUser({
-      data: { onboarded: true }
-    });
-    return { success: true };
-  } catch (error) {
-    return { success: false };
-  }
-}
-
-// دالة لحفظ اشتراك الإشعارات
 export async function savePushSubscription(sub: any) {
   try {
     const { userId } = await auth();
