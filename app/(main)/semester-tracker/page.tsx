@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calculator, AlertTriangle, CheckCircle2, XCircle, Lock, Plus, Trash2, Loader2 } from "lucide-react";
@@ -17,11 +17,64 @@ import { coursesCatalog } from "@/lib/courses";
 import { SemesterData, Grade } from "@/lib/types";
 import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
 
+
+
 export default function SemesterTrackerPage() {
   const [studentDept, setStudentDept] = useState<string>("");
   const [semesters, setSemesters] = useState<SemesterData[]>([]);
   const [actualDeptName, setActualDeptName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+
+  const pendingSave = useRef(false);
+  const latestSemesters = useRef(semesters);
+
+
+  // 1. محرك الحفظ الذكي (Debounce + Local Cache)
+  useEffect(() => {
+    // تجاهل الحفظ إذا كانت الداتا لسه بتحمل
+    if (!semesters || semesters.length === 0) return;
+
+    // حفظ محلي فوري كنسخة احتياطية
+    localStorage.setItem("studyhub-degree-audit", JSON.stringify(semesters));
+    pendingSave.current = true;
+
+    // تشغيل تايمر 3 ثواني بعد آخر تعديل
+    const syncTimer = setTimeout(async () => {
+      try {
+        await saveAcademicProfile({ semesters });
+        pendingSave.current = false;
+      } catch (error) {
+        console.error("خطأ في المزامنة:", error);
+      }
+    }, 60000);
+
+    // إلغاء التايمر لو المستخدم عمل تعديل جديد قبل انتهاء الـ 3 ثواني
+    return () => clearTimeout(syncTimer);
+  }, [semesters]);
+
+  // 2. ضمان الإرسال للسيرفر عند إغلاق الموقع أو الخروج من الصفحة
+  useEffect(() => {
+    const handleExit = () => {
+      // لو في تعديلات لسه متبعتتش (التايمر مخلصش) والمستخدم قفل
+      if (pendingSave.current) {
+        saveAcademicProfile({ semesters: latestSemesters.current });
+        pendingSave.current = false;
+      }
+    };
+
+    // يراقب تغيير التاب أو قفل المتصفح
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === 'hidden') handleExit();
+    });
+    // يراقب قفل الصفحة بشكل كامل (Refresh / Close)
+    window.addEventListener("beforeunload", handleExit);
+
+    return () => {
+      window.removeEventListener("visibilitychange", handleExit);
+      window.removeEventListener("beforeunload", handleExit);
+      handleExit(); // يحفظ لو اتنقل لصفحة تانية داخل الموقع (Unmount)
+    };
+  }, []);
 
   // 2. التحميل الذكي (أوفلاين أولاً)
   // 1. التحميل الذكي (أوفلاين أولاً)
@@ -219,7 +272,8 @@ export default function SemesterTrackerPage() {
   const handleAddSemester = (name: string) => {
     if (semesters.find(s => s.name === name)) return alert("هذا الفصل مضاف بالفعل");
     const updated = [...semesters, { name, semesterGpa: 0, semesterCredits: 0, courses: [] }];
-    saveSemestersToCloud(updated);
+    //saveSemestersToCloud(updated);
+    setSemesters(updated);
   };
 
   const handleGradeChange = (semIndex: number, courseId: string, newGrade: Grade) => {
@@ -227,7 +281,8 @@ export default function SemesterTrackerPage() {
     const course = updated[semIndex].courses.find(c => c.id === courseId);
     if (course) {
       course.grade = newGrade;
-      saveSemestersToCloud(updated);
+      //saveSemestersToCloud(updated);
+      setSemesters(updated);
     }
   };
 
@@ -559,7 +614,8 @@ export default function SemesterTrackerPage() {
         </div>
                     <Button variant="ghost" size="icon" onClick={() => {
                       if(confirm("متأكد من حذف هذا الفصل بالكامل؟")) {
-                        const up = [...semesters]; up.splice(semIndex,1); saveSemestersToCloud(up);
+                        const up = [...semesters]; up.splice(semIndex,1); setSemesters(up);
+                        // saveSemestersToCloud(up);
                       }
                     }}>
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -579,7 +635,8 @@ export default function SemesterTrackerPage() {
                           points: 0, 
                           isRetake: allStudentRecords.some(r => r.courseCode === code) 
                         });
-                        saveSemestersToCloud(updated); e.target.value = "";
+                        setSemesters(updated); e.target.value = "";
+                        //saveSemestersToCloud(updated);
                       }}
                       defaultValue=""
                       >
@@ -637,7 +694,8 @@ export default function SemesterTrackerPage() {
                              {["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F", "Fail", "Taken"].map(g => <option key={g} value={g}>{g}</option>)}
                            </select>
                            <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 text-muted-foreground hover:text-destructive" onClick={() => {
-                             const updated = [...semesters]; updated[semIndex].courses = updated[semIndex].courses.filter(item => item.id !== record.id); saveSemestersToCloud(updated);
+                             const updated = [...semesters]; updated[semIndex].courses = updated[semIndex].courses.filter(item => item.id !== record.id); setSemesters(updated);
+                             // saveSemestersToCloud(updated);
                            }}><XCircle className="h-4 w-4" /></Button>
                          </div>
                        )
