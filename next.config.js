@@ -11,69 +11,54 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: false, 
   
-  workboxOptions: {
-    runtimeCaching: [
-      // 1. قاعدة الـ Navigate
-      {
-        urlPattern: ({ request }) => request.mode === 'navigate',
-        handler: 'NetworkFirst', 
-        options: {
-          cacheName: 'pages-cache',
-          networkTimeoutSeconds: 3, 
-          cacheableResponse: { statuses: [0, 200] },
+  workboxOptions: {workboxOptions: {
+      runtimeCaching: [
+        // 1. 🚀 القاعدة الشاملة لكل صفحات وداتا Next.js
+        {
+          urlPattern: ({ request, url }) => {
+            const isNav = request.mode === 'navigate';
+            const isRsc = request.headers.get('rsc') !== null || url.searchParams.has('_rsc');
+            const isNextData = url.pathname.startsWith('/_next/data/');
+            const isAction = request.headers.get('next-action') !== null;
+
+            return isNav || isRsc || isNextData || isAction;
+          },
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'next-comprehensive-cache',
+            networkTimeoutSeconds: 3,
+            matchOptions: {
+              ignoreSearch: true, // 👈 تجاهل الـ Params عشان الـ RSC يشتغل
+              ignoreVary: true
+            },
+            expiration: {
+              maxEntries: 100,
+              maxAgeSeconds: 30 * 24 * 60 * 60,
+            },
+            cacheableResponse: {
+              statuses: [0, 200],
+            },
+          },
         },
-      },
-      // 2. Next.js Data JSON
-      {
-        urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
-        handler: 'StaleWhileRevalidate',
-        options: { cacheName: 'next-data-cache' },
-      },
-      // 3. الصور
-      {
-        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'images-cache',
-          expiration: { maxEntries: 100 },
+        // 2. تكييش الصور والأيقونات
+        {
+          urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'images-cache',
+            expiration: { maxEntries: 50 },
+          },
         },
-      },
-      // 4. الكود (JS/CSS)
-      {
-        urlPattern: /\.(?:js|css)$/i,
-        handler: 'StaleWhileRevalidate',
-        options: { cacheName: 'static-resources' },
-      },
-      // 5. الـ Server Actions
-      {
-        urlPattern: ({ request }) => {
-          const headers = request.headers;
-          return (
-            headers.get('next-action') !== null ||
-            headers.get('x-nextjs-data') !== null ||
-            headers.get('rsc') !== null
-          );
+        // 3. تكييش ملفات الـ Static (JS/CSS)
+        {
+          urlPattern: /\.(?:js|css)$/i,
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'static-resources',
+          },
         },
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'server-actions-cache',
-          networkTimeoutSeconds: 3,
-          cacheableResponse: { statuses: [0, 200] }
-        },
-      },
-      // 6. API Routes
-      {
-        urlPattern: /^\/api\/.*$/i,
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'api-routes-cache',
-          networkTimeoutSeconds: 3,
-          expiration: { maxEntries: 50 },
-          cacheableResponse: { statuses: [0, 200] }
-        },
-      },
-    ] // 👈 قفلنا المصفوفة
-  } // 👈 قفلنا الـ workboxOptions
+      ],
+    },
 });
 
 /** @type {import('next').NextConfig} */
