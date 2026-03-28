@@ -6,6 +6,7 @@ import { StudyProvider } from '@/lib/study-context'
 import { PromptProvider } from "@/hooks/use-floating-prompts"
 import { InstallPWA } from "@/components/InstallPWA"
 import { NotificationPrompt } from "@/components/NotificationPrompt"
+import { CacheBuster } from "@/components/CacheBuster"
 import './globals.css'
 
 export const maxDuration = 60;
