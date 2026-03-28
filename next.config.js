@@ -12,43 +12,42 @@ const withPWA = withPWAInit({
   reloadOnOnline: false, // ممتاز إننا قافلينه عشان المزامنة
   
   workboxOptions: {
-    runtimeCaching: [
-      // 🚀 القنبلة الجديدة: تكييش أي صفحة بيتم زيارتها (عشان الـ Refresh يشتغل أوفلاين)
-      {
-        urlPattern: ({ request }) => request.mode === 'navigate',
-        handler: 'NetworkFirst', 
-        options: {
-          cacheName: 'pages-cache',
-          networkTimeoutSeconds: 1.5, // لو النت اتأخر ثانية ونصف افتح الكاش فوراً
-          expiration: {
-            maxEntries: 50,
-            maxAgeSeconds: 30 * 24 * 60 * 60, // شهر
+      runtimeCaching: [
+        {
+          // 🚀 دي هتمسك صفحة المواضيع، وصفحة الـ view بالـ ID بتاعها، وأي صفحة تانية
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkFirst', 
+          options: {
+            cacheName: 'all-pages-cache',
+            networkTimeoutSeconds: 2, 
+            expiration: {
+              maxEntries: 50,
+              maxAgeSeconds: 30 * 24 * 60 * 60,
+            },
+            cacheableResponse: {
+              statuses: [0, 200],
+            },
           },
-          cacheableResponse: {
-            statuses: [0, 200],
+        },
+        // تكييش الصور والأيقونات (عشان الموقع ميبقاش أقرع وأنت أوفلاين)
+        {
+          urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'images-cache',
+            expiration: { maxEntries: 100 },
           },
         },
-      },
-      // تكييش صفحة المواد الخاصة بك كما كانت
-      {
-        urlPattern: /\/subjects\/view$/i, 
-        handler: 'CacheFirst', 
-        options: {
-          cacheName: 'static-subject-shell',
-          expiration: { maxEntries: 1 },
-          cacheableResponse: { statuses: [0, 200] }
+        // تكييش ملفات التشغيل (JS/CSS)
+        {
+          urlPattern: /\.(?:js|css)$/i,
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'static-assets',
+          },
         },
-      },
-      // تكييش ملفات الـ JS والـ CSS (مهم جداً للـ Refresh)
-      {
-        urlPattern: /\.(?:js|css)$/i,
-        handler: 'StaleWhileRevalidate',
-        options: {
-          cacheName: 'static-resources',
-        },
-      },
-    ],
-  },
+      ],
+    },
 });
 
 /** @type {import('next').NextConfig} */
