@@ -29,21 +29,22 @@ export async function checkIsAdmin(): Promise<boolean> {
     const { userId } = await auth(); 
     if (!userId) return false;
 
-    let admins = await kv.get<string[]>('site-admins');
+    // 💥 السحر هنا: بنقرأ اللستة من الكاش مش من Upstash
+    let admins = await getCachedAdmins();
     
-    if (!admins || admins.length === 0) {
+    // لو اللستة فاضية خالص (أول مرة الموقع يشتغل)، خلي أول واحد يدخل هو الإدمن
+    if (admins.length === 0) {
       admins = [userId];
       await kv.set('site-admins', admins);
-      return true;
+      revalidateTag('site-admins-data'); // نحدث الكاش فوراً عشان الأجهزة التانية تحس
     }
 
+    // بنقارن الآي دي بتاع الشخص باللستة اللي في الرامات
     return admins.includes(userId);
   } catch (error) {
     return false;
   }
 }
-
-
 
 // 1. الدالة المكيشة (بتستخدم الدالة النظيفة اللي مفيهاش كوكيز)
 const getCachedAllStudents = unstable_cache(
@@ -112,6 +113,17 @@ export async function getAllStudents() {
   }
 }
 
+
+// 🚀 دالة بتجيب لستة الإدمنز مرة واحدة بس وتحطها في রامات السيرفر
+const getCachedAdmins = unstable_cache(
+  async () => {
+    const admins = await kv.get<string[]>('site-admins');
+    return admins || [];
+  },
+  ['site-admins-cache'],
+  { tags: ['site-admins-data'], revalidate: 86400 } // تعيش 24 ساعة
+);
+
 export async function toggleAdminStatus(targetUserId: string, makeAdmin: boolean) {
   try {
     const isAdmin = await checkIsAdmin();
@@ -130,6 +142,7 @@ export async function toggleAdminStatus(targetUserId: string, makeAdmin: boolean
     }
 
     await kv.set('site-admins', admins);
+    revalidateTag('site-admins-data');
     return { success: true };
   } catch (error) {
     return { success: false };
