@@ -13,6 +13,7 @@ export default async function LandingPage() {
 
   // 2. لو مش مسجل دخول، اعرض صفحة الهبوط
   return (
+    <>
     <AuthRedirectFallback />
     <div className="min-h-screen bg-[#0a0a0a] text-white selection:bg-cyan-500/30 font-sans">
       
@@ -102,5 +103,6 @@ export default async function LandingPage() {
         </div>
       </main>
     </div>
+    </>
   );
 }
