@@ -6,6 +6,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { AcademicProfile } from "./academicActions"
 import legacyUsers from "@/lib/legacy-users.json" // 👈 ضفنا ملف الخريطة هنا
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 const getSupabaseAdmin = async () => {
   const cookieStore = await cookies()
@@ -42,11 +43,8 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 }
 
-export async function getAllStudents() {
-  try {
-    const isAdmin = await checkIsAdmin();
-    if (!isAdmin) throw new Error("Unauthorized");
-
+const getCachedAllStudents = unstable_cache(
+  async () => {
     const supabaseAdmin = await getSupabaseAdmin();
     
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
@@ -58,31 +56,26 @@ export async function getAllStudents() {
     if (!users || users.length === 0) return [];
 
     const studentsData: any[] = [];
-    
-    // 🚀 التعديل الذهبي: هنقسمهم لـ 100 طالب في الضربة عشان نوفر الأوامر
     const chunkSize = 100;
 
     for (let i = 0; i < users.length; i += chunkSize) {
       const chunk = users.slice(i, i + chunkSize);
       
-      // نجهز أسماء المفاتيح اللي عايزين نجيبها
       const resolvedIds = chunk.map(user => getResolvedId(user.email, user.id));
       const profileKeys = resolvedIds.map(id => `academic-profile-${id}`);
       const notesKeys = resolvedIds.map(id => `advising-notes-${id}`);
 
-      // 💥 السحر هنا: أمر واحد بيجيب 100 بروفايل وأمر واحد بيجيب 100 نوتس
       const [profiles, advisingNotes] = await Promise.all([
         profileKeys.length > 0 ? kv.mget(...profileKeys) : Promise.resolve([]),
         notesKeys.length > 0 ? kv.mget(...notesKeys) : Promise.resolve([])
       ]);
 
-      // نجمع الداتا بنفس التنسيق بتاعك بالظبط عشان الفرونت إند ميبوظش
       chunk.forEach((user, index) => {
         const profile = profiles[index] as AcademicProfile | null;
         const note = advisingNotes[index] as string | null;
 
         studentsData.push({
-          userId: user.id, // بنبعت الآي دي بتاع سوبابيس للواجهة عشان الحذف والتعديل يشتغل صح
+          userId: user.id,
           advisingNotes: note || "",
           profile: {
             name: profile?.name || user.user_metadata?.full_name || user.email || "مستخدم بدون اسم",
@@ -95,6 +88,19 @@ export async function getAllStudents() {
     }
 
     return studentsData;
+  },
+  ['admin-all-students-cache'], // اسم الكاش في الرامات
+  { tags: ['admin-students-data'], revalidate: 86400 } // الكاش هيعيش 24 ساعة طالما مفيش تعديل
+);
+
+
+export async function getAllStudents() {
+  try {
+    const isAdmin = await checkIsAdmin();
+    if (!isAdmin) throw new Error("Unauthorized");
+
+    // 🚀 السيرفر هيرد من الرامات فوراً (استهلاك الداتا بيز = صفر)
+    return await getCachedAllStudents();
   } catch (error) {
     console.error("Error fetching students:", error);
     return [];
@@ -194,6 +200,11 @@ export async function saveAdvisingNotes(studentId: string, notes: string) {
     const resolvedId = getResolvedId(user?.email, studentId);
 
     await kv.set(`advising-notes-${resolvedId}`, notes);
+    
+    // 💥 السطر العبقري: بندمر الكاش! 
+    // أول ما تفتح صفحة الإدمن من التليفون أو الكمبيوتر بعد التعديل، هيجيب الداتا الجديدة الفريش
+    revalidateTag('admin-students-data');
+
     return { success: true };
   } catch (error) {
     return { success: false };

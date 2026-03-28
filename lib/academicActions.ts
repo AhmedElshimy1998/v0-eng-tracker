@@ -12,6 +12,7 @@ export interface AcademicProfile {
   department: string;
   semesters: SemesterData[];
   lastUpdated?: number; // الطابع الزمني للمزامنة الذكية
+  
 }
 
 export interface DepartmentItem {
@@ -80,6 +81,7 @@ export async function saveAcademicProfile(data: any) {
     
     await kv.set(key, newData);
     revalidateTag('academic-profile');
+    revalidateTag('admin-students-data');
     return { success: true };
     
   } catch (error) {
