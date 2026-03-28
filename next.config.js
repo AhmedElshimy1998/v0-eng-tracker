@@ -60,7 +60,7 @@ const withPWA = withPWAInit({
         urlPattern({ request }) {
           return (
             request.headers.get('next-action') !== null || 
-            request.headers.get('x-nextjs-data') !==  ||
+            request.headers.get('x-nextjs-data') !== null ||
             request.headers.get('rsc') ||         // RSC Data
             url.searchParams.has('_rsc')          // RSC Query Param
           );
