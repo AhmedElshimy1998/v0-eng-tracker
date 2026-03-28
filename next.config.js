@@ -13,79 +13,64 @@ const withPWA = withPWAInit({
   
   workboxOptions: {
     runtimeCaching: [
-      // 1. قاعدة الـ Navigate (الـ Refresh العام)
-      {
-        urlPattern: ({ request }) => request.mode === 'navigate',
-        handler: 'NetworkFirst', 
-        options: {
-          cacheName: 'pages-cache',
-          networkTimeoutSeconds: 3, 
-          expiration: {
-            maxEntries: 50,
-            maxAgeSeconds: 30 * 24 * 60 * 60,
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
+        // 1. قاعدة الـ Navigate
+        {
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkFirst', 
+          options: {
+            cacheName: 'pages-cache',
+            networkTimeoutSeconds: 3, 
+            cacheableResponse: { statuses: [0, 200] },
           },
         },
-      },
-      // 2. تكييش داتا الصفحات (Next.js Data JSON) - ضروري للـ Refresh
-      {
-        urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
-        handler: 'StaleWhileRevalidate',
-        options: {
-          cacheName: 'next-data-cache',
+        // 2. Next.js Data JSON
+        {
+          urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
+          handler: 'StaleWhileRevalidate',
+          options: { cacheName: 'next-data-cache' },
         },
-      },
-      // 3. تكييش الصور والملفات الثابتة
-      {
-        //
-        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'images-cache',
-          expiration: { maxEntries: 100 },
+        // 3. الصور
+        {
+          urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'images-cache',
+            expiration: { maxEntries: 100 },
+          },
         },
-      },
-      // 4. تكييش ملفات الكود (JS/CSS)
-      {
-        urlPattern: /\.(?:js|css)$/i,
-        handler: 'StaleWhileRevalidate',
-        options: {
-          cacheName: 'static-resources',
+        // 4. الكود (JS/CSS)
+        {
+          urlPattern: /\.(?:js|css)$/i,
+          handler: 'StaleWhileRevalidate',
+          options: { cacheName: 'static-resources' },
         },
-      },
-      // 5. تكييش الـ Server Actions (الداتا اللي راجعة من السيرفر)
-      {
-        urlPattern({ request }) {
-          return (
-            request.headers.get('next-action') !== null || 
-            request.headers.get('x-nextjs-data') !== null ||
-            request.headers.get('rsc') !== null ||         // RSC Data
-            url.searchParams.has('_rsc') !== null          // RSC Query Param
-          );
-        }, // 👈 القوس ده كان ناقص عندك
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'next-dynamic-data',
-          networkTimeoutSeconds: 3,
-          expiration: { maxEntries: 100 },
-          cacheableResponse: { statuses: [0, 200] }
+        // 5. 🚀 الـ Server Actions (تم تصحيح السنتاكس هنا)
+        {
+          urlPattern: ({ request }) => {
+            const isAction = request.headers.get('next-action') !== null;
+            const isData = request.headers.get('x-nextjs-data') !== null;
+            const isRsc = request.headers.get('rsc') !== null;
+            return isAction || isData || isRsc;
+          },
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'server-actions-cache',
+            networkTimeoutSeconds: 3,
+            cacheableResponse: { statuses: [0, 200] }
+          },
         },
-      },
-      // 6. تكييش الـ API Routes
-      {
-        urlPattern: /^\/api\/.*$/i,
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'api-routes-cache',
-          networkTimeoutSeconds: 3,
-          expiration: { maxEntries: 50 },
-          cacheableResponse: { statuses: [0, 200] }
+        // 6. API Routes
+        {
+          urlPattern: /^\/api\/.*$/i,
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'api-routes-cache',
+            networkTimeoutSeconds: 3,
+            expiration: { maxEntries: 50 },
+            cacheableResponse: { statuses: [0, 200] }
+          },
         },
-      },
-    ],
-  },
+      ],
 });
 
 /** @type {import('next').NextConfig} */
