@@ -43,11 +43,15 @@ export async function checkIsAdmin(): Promise<boolean> {
   }
 }
 
+
+
+// 1. الدالة المكيشة (بتستخدم الدالة النظيفة اللي مفيهاش كوكيز)
 const getCachedAllStudents = unstable_cache(
   async () => {
-    const supabaseAdmin = await getSupabaseAdmin();
+    // 👈 السحر هنا: بنستخدم العميل اللي مبيسألش على الكوكيز
+    const pureAdmin = getPureSupabaseAdmin(); 
     
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
+    const { data: { users }, error } = await pureAdmin.auth.admin.listUsers({
       page: 1,
       perPage: 500
     });
@@ -89,17 +93,18 @@ const getCachedAllStudents = unstable_cache(
 
     return studentsData;
   },
-  ['admin-all-students-cache'], // اسم الكاش في الرامات
-  { tags: ['admin-students-data'], revalidate: 86400 } // الكاش هيعيش 24 ساعة طالما مفيش تعديل
+  ['admin-all-students-cache'],
+  { tags: ['admin-students-data'], revalidate: 86400 } 
 );
 
 
 export async function getAllStudents() {
   try {
+    // التحقق من الصلاحيات بيحصل بره الكاش (عادي يستخدم كوكيز هنا)
     const isAdmin = await checkIsAdmin();
     if (!isAdmin) throw new Error("Unauthorized");
 
-    // 🚀 السيرفر هيرد من الرامات فوراً (استهلاك الداتا بيز = صفر)
+    // 🚀 زيرو استهلاك: الرد بييجي من الرامات!
     return await getCachedAllStudents();
   } catch (error) {
     console.error("Error fetching students:", error);
@@ -188,6 +193,20 @@ export async function getAdvisingNotes(studentId: string): Promise<string> {
   } catch (error) {
     return "";
   }
+}
+
+// 🚀 دالة جديدة نظيفة تماماً من الكوكيز (للاستخدام داخل الكاش فقط)
+const getPureSupabaseAdmin = () => {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        getAll() { return [] }, // بنقوله مفيش كوكيز
+        setAll() {}
+      }
+    }
+  )
 }
 
 export async function saveAdvisingNotes(studentId: string, notes: string) {
