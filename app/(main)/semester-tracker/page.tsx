@@ -23,6 +23,36 @@ export default function SemesterTrackerPage() {
   const [actualDeptName, setActualDeptName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
+
+  // 1. مراجع لتتبع التايمر والداتا عشان لو الصفحة اتقفلت فجأة
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSave = useRef(false);
+  const latestSemesters = useRef(semesters);
+
+  useEffect(() => {
+    latestSemesters.current = semesters;
+  }, [semesters]);
+
+  // 2. صمام الأمان (بيرفع الداتا فوراً لو المستخدم قفل المتصفح)
+  useEffect(() => {
+    const handleExit = () => {
+      if (pendingSave.current) {
+        saveAcademicProfile({ semesters: latestSemesters.current, lastUpdated: Date.now() });
+        pendingSave.current = false;
+      }
+    };
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === 'hidden') handleExit();
+    });
+    window.addEventListener("beforeunload", handleExit);
+    return () => {
+      window.removeEventListener("visibilitychange", handleExit);
+      window.removeEventListener("beforeunload", handleExit);
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      handleExit();
+    };
+  }, []);
+
   // 2. التحميل الذكي (أوفلاين أولاً)
   // 1. التحميل الذكي (أوفلاين أولاً)
   useEffect(() => {
@@ -119,85 +149,49 @@ export default function SemesterTrackerPage() {
   }, []);
 
   // 3. الحفظ الفوري (Optimistic Saving)
-  const saveSemestersToCloud = async (updatedSemesters: SemesterData[]) => {// 1. مراجع لتتبع التايمر والداتا أثناء الإغلاق
-  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingSave = useRef(false);
-  const latestSemesters = useRef(semesters);
-
-  useEffect(() => {
-    latestSemesters.current = semesters;
-  }, [semesters]);
-
-  // 2. الدالة السحرية (Debounced Save) - استبدل دالتك القديمة بهذه
   const saveSemestersToCloud = (updatedSemesters: SemesterData[]) => {
-    // 1. تحديث الشاشة فوراً
-    setSemesters(updatedSemesters);
     
-    // 2. الحفظ المحلي فوراً (بالمفتاح الأصلي بتاعك عشان الداتا ماتضيعش!)
+    // 1. تحديث الـ State فوراً لضمان تجربة مستخدم سريعة
+    setSemesters(updatedSemesters); 
+    
+    // 2. الحفظ المحلي الفوري (أمان لو حصل ريفرش)
     const localProfileStr = localStorage.getItem("studyhub-academic-profile");
     let profileObj = localProfileStr ? JSON.parse(localProfileStr) : {};
-    
     profileObj.semesters = updatedSemesters;
-    profileObj.lastUpdated = Date.now(); // ختم الوقت مهم جداً
-    
+    profileObj.lastUpdated = Date.now(); 
     localStorage.setItem("studyhub-academic-profile", JSON.stringify(profileObj));
-    localStorage.setItem("academic-needs-sync", "true"); // علامة إن في داتا لسه مترفعتش
-    
-    pendingSave.current = true;
 
-    // 3. مسح أي تايمر قديم لو المستخدم ضغط تعديل/إضافة مرتين ورا بعض بسرعة
+    // 3. تفعيل علامة "محتاج مزامنة"
+    localStorage.setItem("academic-needs-sync", "true");
+
+    // 4. الذكاء الجديد (التايمر): بدل الرفع الفوري، هنستنى 3 ثواني
+    pendingSave.current = true; // إعلان إن في داتا مستنية تترفع
+
+    // لو في تايمر شغال (المستخدم بيعدل بسرعة)، امسحه وابدأ عد من الأول
     if (syncTimerRef.current) {
       clearTimeout(syncTimerRef.current);
     }
 
-    // 4. تشغيل تايمر الـ 3 ثواني (الرفع للسيرفر أمر واحد مجمع)
+    // ابدأ العداد
     syncTimerRef.current = setTimeout(async () => {
       if (navigator.onLine) {
         try {
-          console.log("📤 جاري رفع التعديلات المجمعة للسيرفر...");
+          console.log("📤 جاري رفع التعديلات المجمعة بـ 1 Command...");
           const result = await saveAcademicProfile({ 
             semesters: updatedSemesters, 
             lastUpdated: profileObj.lastUpdated 
           });
           
           if (result.success) {
-            localStorage.setItem("academic-needs-sync", "false"); // نشيل العلامة
-            pendingSave.current = false;
-            console.log("✅ تمت المزامنة للسيرفر بنجاح بـ 1 Command!");
+            localStorage.setItem("academic-needs-sync", "false");
+            pendingSave.current = false; // الداتا اترفعت خلاص
+            console.log("✅ تمت المزامنة المجمعة بنجاح!");
           }
         } catch (e) {
-          console.error("⚠️ فشل الرفع، سيعاد المحاولة.");
+          console.log("⚠️ فشل الرفع، سيتم المحاولة مرة أخرى.");
         }
       }
-    }, 3000);
-  };
-
-  // 3. صمام الأمان الفولاذي (لو قفل الصفحة فجأة قبل الـ 3 ثواني ما يخلصوا)
-  useEffect(() => {
-    const handleExit = () => {
-      // لو في حفظ متعلق (pending) والمستخدم بيقفل، نضربه للسيرفر فوراً
-      if (pendingSave.current) {
-        saveAcademicProfile({ 
-          semesters: latestSemesters.current, 
-          lastUpdated: Date.now() 
-        });
-        pendingSave.current = false;
-      }
-    };
-
-    // مراقبة تغيير التاب أو قفل المتصفح أو عمل ريفرش
-    window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === 'hidden') handleExit();
-    });
-    window.addEventListener("beforeunload", handleExit);
-
-    return () => {
-      window.removeEventListener("visibilitychange", handleExit);
-      window.removeEventListener("beforeunload", handleExit);
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-      handleExit();
-    };
-  }, []);
+    }, 3000); // 3 ثواني
   };
 
   const displayCatalog = useMemo(() => {
