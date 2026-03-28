@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export default async function proxy(req: NextRequest) {
-  let response = NextResponse.next({ request: req })
+ let response = NextResponse.next({ request: req })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,17 +22,20 @@ export default async function proxy(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const user = session?.user
 
-  const isPublicPattern = /^\/(?:sign-in|sign-up|api|news|icon|logo|manifest\.json|sw\.js|auth|$)/;
-  const isPublic = isPublicPattern.test(req.nextUrl.pathname);
-  const isHomePage = req.nextUrl.pathname === '/';
+  const path = req.nextUrl.pathname;
 
-  // حالة 1: مستخدم مش مسجل وبيحاول يدخل صفحة خاصة
+  // نظفنا الـ Regex لأن الماتشر هيتولى مهمة استبعاد الـ api وملفات الـ PWA
+  const isPublicPattern = /^\/(?:sign-in|sign-up|news|icon|logo|auth|$)/;
+  const isPublic = isPublicPattern.test(path);
+  const isHomePage = path === '/';
+
+  // حالة 1: مستخدم مش مسجل وبيحاول يدخل صفحة خاصة (هيرجع للرئيسية)
   if (!user && !isPublic) {
     return NextResponse.redirect(new URL('/', req.url));
   }
 
-  // حالة 2: مستخدم مسجل دخول وراح للرئيسية أو صفحة الدخول
-  if (user && (isHomePage || req.nextUrl.pathname.startsWith('/sign-in') || req.nextUrl.pathname.startsWith('/sign-up'))) {
+  // حالة 2: مستخدم مسجل دخول وراح للرئيسية أو صفحة الدخول (هيروح للداشبورد)
+  if (user && (isHomePage || path.startsWith('/sign-in') || path.startsWith('/sign-up'))) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
@@ -40,5 +43,12 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)', '/(api|trpc)(.*)'],
-}
+  matcher: [
+    // الكود ده معناه: اشتغل على كل مسارات الموقع، "ما عدا":
+    // 1. مسار الـ api/ بالكامل (عشان الـ CRON jobs والـ webhooks تاخد راحتها)
+    // 2. ملفات الـ PWA (manifest, sw.js)
+    // 3. ملفات النظام بتاعة Next.js
+    // 4. الصور والملفات الثابتة
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};
