@@ -4,6 +4,7 @@ import { kv } from "@vercel/kv"
 import { auth } from "@/lib/auth-server"
 import { SemesterData } from "@/lib/types" 
 import legacyUsers from "@/lib/legacy-users.json"
+import { unstable_cache, revalidateTag } from "next/cache";
 
 export interface AcademicProfile {
   name: string;
@@ -25,12 +26,24 @@ const defaultDepartments: DepartmentItem[] = [
   { id: "Energy", name: "هندسة الطاقة والنظم الكهربية" }
 ];
 
+// أ - الدالة المساعدة اللي بتخزن الداتا في الكاش
+const getCachedProfile = unstable_cache(
+  async (userId: string) => {
+    const data = await kv.get<AcademicProfile>(`academic-profile-${userId}`);
+    return data || null;
+  },
+  ['academic-profile-cache'],
+  { tags: ['academic-profile'] } // 👈 التاج ده مهم جداً عشان هنمسح بيه الكاش بعدين
+);
+
+// ب - الدالة الأساسية اللي ملفاتك كلها بتناديها (مش هتغير اسمها عشان متبوظش ملفاتك)
 export async function getAcademicProfile() {
   try {
     const { userId } = await auth();
     if (!userId) return null;
-    const data = await kv.get<AcademicProfile>(`academic-profile-${userId}`);
-    return data || null;
+    
+    // بدل ما نكلم Upstash كل مرة، بنكلم الكاش بتاع السيرفر!
+    return await getCachedProfile(userId);
   } catch (error) {
     return null;
   }
@@ -66,6 +79,7 @@ export async function saveAcademicProfile(data: any) {
     };
     
     await kv.set(key, newData);
+    revalidateTag('academic-profile');
     return { success: true };
     
   } catch (error) {
@@ -75,18 +89,23 @@ export async function saveAcademicProfile(data: any) {
 }
 
 // دوال إدارة الأقسام للإدمن
-export async function getDepartments(): Promise<DepartmentItem[]> {
-  try {
-    const data = await kv.get<DepartmentItem[]>('global-departments');
-    return data || defaultDepartments;
-  } catch (error) {
-    return defaultDepartments;
-  }
-}
+export const getDepartments = unstable_cache(
+  async () => {
+    try {
+      const data = await kv.get<DepartmentItem[]>('global-departments');
+      return data || defaultDepartments;
+    } catch (error) {
+      return defaultDepartments;
+    }
+  },
+  ['global-departments-cache'], // اسم الكاش في الميموري
+  { revalidate: 86400, tags: ['departments'] } // 86400 ثانية = 24 ساعة!
+);
 
 export async function saveDepartments(departments: DepartmentItem[]) {
   try {
     await kv.set('global-departments', departments);
+    revalidateTag('departments');
     return { success: true };
   } catch (error) {
     return { success: false };

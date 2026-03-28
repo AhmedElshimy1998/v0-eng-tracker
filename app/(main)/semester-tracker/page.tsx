@@ -184,13 +184,33 @@ export default function SemesterTrackerPage() {
           
           if (result.success) {
             localStorage.setItem("academic-needs-sync", "false");
-            pendingSave.current = false; // الداتا اترفعت خلاص
+            pendingSave.current = false;
             console.log("✅ تمت المزامنة المجمعة بنجاح!");
+          } 
+          // 🚀 اللمسة الجديدة: لو السيرفر رفض عشان في داتا أحدث من جهاز تاني
+          else if (result.error === "Server data is newer") {
+            console.log("🔄 تم اكتشاف تعديل من جهاز آخر! جاري سحب البيانات الجديدة...");
+            
+            // 1. نلغي علامة الحفظ عشان منعملش لوب
+            pendingSave.current = false; 
+            
+            // 2. نجيب الداتا الفريش من السيرفر (بتاعة الموبايل)
+            const freshProfile = await getAcademicProfile();
+            
+            if (freshProfile && freshProfile.semesters) {
+              // 3. نحدث اللاب توب بالداتا الجديدة
+              setSemesters(freshProfile.semesters);
+              
+              // 4. نحدث اللوكال ستوريدج بتاع اللاب توب عشان يبقى زي الموبايل
+              localStorage.setItem("studyhub-academic-profile", JSON.stringify(freshProfile));
+              
+              // 5. ندي تنبيه للطالب
+              alert("تم تحديث بياناتك بناءً على تعديلات قمت بها من جهاز آخر لضمان عدم فقدان البيانات.");
+            }
           }
         } catch (e) {
           console.log("⚠️ فشل الرفع، سيتم المحاولة مرة أخرى.");
         }
-      }
     }, 30000); // 3 ثواني
   };
 
