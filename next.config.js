@@ -61,8 +61,8 @@ const withPWA = withPWAInit({
           return (
             request.headers.get('next-action') !== null || 
             request.headers.get('x-nextjs-data') !== null ||
-            request.headers.get('rsc') ||         // RSC Data
-            url.searchParams.has('_rsc')          // RSC Query Param
+            request.headers.get('rsc') !== null ||         // RSC Data
+            url.searchParams.has('_rsc') !== null          // RSC Query Param
           );
         }, // 👈 القوس ده كان ناقص عندك
         handler: 'NetworkFirst',
