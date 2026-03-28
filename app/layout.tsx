@@ -50,6 +50,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <CacheBuster />
           <PromptProvider>
           <StudyProvider>
             {children}

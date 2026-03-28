@@ -7,7 +7,7 @@ const withPWA = withPWAInit({
   sw: "sw.js",
   register: true,
   skipWaiting: true,
-  cacheOnFrontEndNav: true,
+  cacheOnFrontEndNav: false,
   aggressiveFrontEndNavCaching: false,
   reloadOnOnline: false,
   
