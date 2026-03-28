@@ -9,7 +9,11 @@ const withPWA = withPWAInit({
   skipWaiting: true,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: false, 
+  reloadOnOnline: false,
+  
+  fallbacks: {
+    document: "/dashboard",
+  },
   
   workboxOptions: {
       runtimeCaching: [
