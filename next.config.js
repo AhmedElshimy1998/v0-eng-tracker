@@ -11,7 +11,7 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: false, 
   
-  workboxOptions: {workboxOptions: {
+  {workboxOptions: {
       runtimeCaching: [
         // 1. 🚀 القاعدة الشاملة لكل صفحات وداتا Next.js
         {
