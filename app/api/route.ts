@@ -14,7 +14,14 @@ webpush.setVapidDetails(
 export async function GET(request: Request) {
   try {
     // 1. أمر واحد لجلب كل المفاتيح
-    const userKeys = await kv.keys("studyhub-cloud-data-*");
+    // 1. أمر واحد لجلب كل المفاتيح (مُحسن باستخدام scan)
+    let cursor = 0;
+    const userKeys: string[] = [];
+    do {
+      const [nextCursor, keys] = await kv.scan(cursor, { match: "studyhub-cloud-data-*", count: 1000 });
+      userKeys.push(...keys);
+      cursor = nextCursor;
+    } while (cursor !== 0);
 
     if (!userKeys || userKeys.length === 0) {
       return NextResponse.json({ message: "No users data found" });

@@ -19,7 +19,8 @@ export default async function proxy(req: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
 
   const isPublicPattern = /^\/(?:sign-in|sign-up|api|news|icon|logo|manifest\.json|sw\.js|auth|$)/;
   const isPublic = isPublicPattern.test(req.nextUrl.pathname);
