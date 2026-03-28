@@ -13,53 +13,38 @@ const withPWA = withPWAInit({
   
   workboxOptions: {
       runtimeCaching: [
-        // 1. 🚀 القاعدة الشاملة والمعدلة (لمنع ظهور الأكواد النصية)
+        // 1. قاعدة الصفحات الأساسية (عشان الريفريش يفتح صفحة مش كود)
         {
-          urlPattern: ({ request, url }) => {
-            const isNav = request.mode === 'navigate';
-            const isRsc = request.headers.get('rsc') !== null || url.searchParams.has('_rsc');
-            const isNextData = url.pathname.startsWith('/_next/data/');
-            const isAction = request.headers.get('next-action') !== null;
-
-            return isNav || isRsc || isNextData || isAction;
-          },
+          urlPattern: ({ request }) => request.mode === 'navigate',
           handler: 'NetworkFirst',
           options: {
-            cacheName: 'next-comprehensive-cache',
+            cacheName: 'pages-cache',
             networkTimeoutSeconds: 3,
-            matchOptions: {
-              ignoreSearch: true,
-              ignoreVary: true 
-            },
-            expiration: {
-              maxEntries: 100,
-              maxAgeSeconds: 30 * 24 * 60 * 60,
-            },
             cacheableResponse: {
               statuses: [0, 200],
-              // 👈 بنجبره يتأكد إن الـ Header ده موجود عشان المتصفح ميتلخبطش
-              headers: {
-                'Content-Type': 'text/x-component' 
-              }
             },
           },
         },
-        // 2. تكييش الصور
+        // 2. قاعدة الداتا (RSC & JSON) - هنستخدم StaleWhileRevalidate عشان السرعة
         {
-          urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-          handler: 'CacheFirst',
-          options: {
-            cacheName: 'images-cache',
-            expiration: { maxEntries: 50 },
+          urlPattern: ({ request, url }) => {
+            return (
+              url.pathname.startsWith('/_next/data/') ||
+              request.headers.get('rsc') === '1' ||
+              url.searchParams.has('_rsc')
+            );
           },
-        },
-        // 3. تكييش ملفات الـ Static (JS/CSS)
-        {
-          urlPattern: /\.(?:js|css)$/i,
           handler: 'StaleWhileRevalidate',
           options: {
-            cacheName: 'static-resources',
+            cacheName: 'next-data',
+            expiration: { maxEntries: 100 },
           },
+        },
+        // 3. الصور والملفات الثابتة
+        {
+          urlPattern: /\.(?:js|css|png|jpg|svg|ico|woff2)$/i,
+          handler: 'CacheFirst',
+          options: { cacheName: 'assets' },
         },
       ],
     },
