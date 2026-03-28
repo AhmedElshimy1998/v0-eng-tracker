@@ -57,34 +57,38 @@ export default function AdminDashboardMain() {
 
     students.forEach(student => {
       const semesters = student.profile.semesters || [];
-      const allRecords = semesters.flatMap((s: any) => s.courses);
-      const effectiveRecords = getEffectiveRecords(allRecords); //
-      const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog); //
+      const allRecords = semesters.flatMap((s: any) => s.courses || []);
+      
+      // 1. حساب المعدل التراكمي الكلي (بيحصل مرة واحدة بس للطالب)
+      const effectiveRecords = getEffectiveRecords(allRecords); 
+      const { gpa: cgpa, totalCredits } = calculateGPA(effectiveRecords, coursesCatalog); 
       
       const level = getLevel(totalCredits);
       lvlStats[level].total++;
 
-      // --- الجزء السحري هنا لفلترة الأترم الـ Taken ---
-      // بنفلتر الأترم اللي "خلصت فعلاً" بس (اللي مجموع ساعاتها أكبر من صفر)
+      // 🚀 التحسين الجراحي هنا: فلترة سريعة جداً بدون عمليات حسابية معقدة
       const finishedSemesters = semesters.filter((s: any) => {
-         const { totalCredits: semCredits } = calculateGPA(s.courses, coursesCatalog);
-         return semCredits > 0; 
+         if (!s.courses || s.courses.length === 0) return false;
+         // الترم بيعتبر "منتهي" لو فيه أي مادة درجتها مش Taken أو W
+         return s.courses.some((c: any) => c.grade && c.grade !== "Taken" && c.grade !== "W");
       });
 
+      // 2. حساب معدل آخر ترم (بيحصل مرة واحدة بس لآخر ترم)
       const lastFinishedSemester = finishedSemesters[finishedSemesters.length - 1];
       let lastSemGpa = 4.0; // افتراضي للطالب المستجد
+      
       if (lastFinishedSemester) {
          const { gpa } = calculateGPA(lastFinishedSemester.courses, coursesCatalog);
          lastSemGpa = gpa;
       }
 
+      // === باقي اللوجيك بتاعك لتوزيع الإحصائيات زي ما هو بالظبط ===
       if (totalCredits > 0) {
         totalGpa += cgpa;
         validGpaStudents++;
         lvlStats[level].gpaSum += cgpa;
         lvlStats[level].gpaCount++;
         
-        // لو المعدل التراكمي أقل من 2 أو آخر ترم خلصته بجد أقل من 2
         if (cgpa < 2.0 || lastSemGpa < 2.0) {
           atRiskCount++;
           lvlStats[level].atRisk++;

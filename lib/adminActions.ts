@@ -55,28 +55,44 @@ export async function getAllStudents() {
     });
 
     if (error) throw error;
+    if (!users || users.length === 0) return [];
 
-    const studentsData = await Promise.all(
-      users.map(async (user) => {
-        // 🔄 قراءة الـ ID القديم (لو موجود) بدل الجديد
-        const resolvedId = getResolvedId(user.email, user.id);
+    const studentsData: any[] = [];
+    
+    // 🚀 التعديل الذهبي: هنقسمهم لـ 100 طالب في الضربة عشان نوفر الأوامر
+    const chunkSize = 100;
 
-        // 📥 جلب الداتا باستخدام الـ ID الصح
-        const profile = await kv.get<AcademicProfile>(`academic-profile-${resolvedId}`);
-        const advisingNotes = await kv.get<string>(`advising-notes-${resolvedId}`) || ""; 
-        
-        return {
+    for (let i = 0; i < users.length; i += chunkSize) {
+      const chunk = users.slice(i, i + chunkSize);
+      
+      // نجهز أسماء المفاتيح اللي عايزين نجيبها
+      const resolvedIds = chunk.map(user => getResolvedId(user.email, user.id));
+      const profileKeys = resolvedIds.map(id => `academic-profile-${id}`);
+      const notesKeys = resolvedIds.map(id => `advising-notes-${id}`);
+
+      // 💥 السحر هنا: أمر واحد بيجيب 100 بروفايل وأمر واحد بيجيب 100 نوتس
+      const [profiles, advisingNotes] = await Promise.all([
+        profileKeys.length > 0 ? kv.mget(...profileKeys) : Promise.resolve([]),
+        notesKeys.length > 0 ? kv.mget(...notesKeys) : Promise.resolve([])
+      ]);
+
+      // نجمع الداتا بنفس التنسيق بتاعك بالظبط عشان الفرونت إند ميبوظش
+      chunk.forEach((user, index) => {
+        const profile = profiles[index] as AcademicProfile | null;
+        const note = advisingNotes[index] as string | null;
+
+        studentsData.push({
           userId: user.id, // بنبعت الآي دي بتاع سوبابيس للواجهة عشان الحذف والتعديل يشتغل صح
-          advisingNotes,
+          advisingNotes: note || "",
           profile: {
             name: profile?.name || user.user_metadata?.full_name || user.email || "مستخدم بدون اسم",
             phone: profile?.phone || user.phone || "لا يوجد هاتف",
             department: profile?.department || "لم يكمل الإعدادات",
             semesters: profile?.semesters || []
           }
-        };
-      })
-    );
+        });
+      });
+    }
 
     return studentsData;
   } catch (error) {

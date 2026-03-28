@@ -213,7 +213,7 @@ export default function SemesterTrackerPage() {
           console.log("⚠️ فشل الرفع، سيتم المحاولة مرة أخرى.");
         }
       }
-    }, 30000); // 3 ثواني
+    }, 60000); // 60 ثواني
   };
 
   const displayCatalog = useMemo(() => {
