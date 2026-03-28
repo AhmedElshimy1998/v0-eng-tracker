@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 
 // 1. استيراد العقل المدبر الجديد
-import { calculateGPA, checkCanTake, getEffectiveRecords, isPassed, getStudentLevel } from "@/lib/academic-logic";
+import { calculateGPA, checkCanTake, getEffectiveRecords, isPassed, getStudentLevel, calculateAcademicWarnings } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses"; 
 import { SemesterData, Grade } from "@/lib/types";
 import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
@@ -246,6 +246,7 @@ export default function SemesterTrackerPage() {
       }, 0);
   }, [effectiveRecords]);
 
+  // حساب الانذارات - انذار
   const warnings = useMemo(() => {
     let consecutiveWarnings = 0;
 
@@ -254,30 +255,37 @@ export default function SemesterTrackerPage() {
     });
 
     sortedSemesters.forEach(sem => {
-      const stats = calculateGPA(sem.courses, coursesCatalog);
+      // 1. تخطي السمر كورس تماماً (return جوه الـ forEach بتشتغل كأنها continue)
+      const semName = (sem.name || "").toLowerCase();
+      if (semName.includes('summer') || semName.includes('صيفي')) {
+        return; 
+      }
+
+      const stats = calculateGPA(sem.courses || [], coursesCatalog);
+      
+      // 2. تخطي الترمات الصفرية أو اللي درجاتها لسه Taken
       if (stats.totalCredits > 0) {
+        // 3. حساب الإنذار الفصلي
         if (stats.gpa < 2.0) {
-          consecutiveWarnings++;
+          consecutiveWarnings++; // المعدل تحت 2، ياخد إنذار
         } else {
-          consecutiveWarnings = 0;
+          consecutiveWarnings = 0; // جاب 2 أو أكتر، العداد يتصفر فوراً
         }
       }
     });
 
-    const hasCumulativeWarning = cgpa < 2.0 && completedCredits > 0;
-    let totalCount = consecutiveWarnings + (hasCumulativeWarning ? 1 : 0);
+    // 4. مسحنا الإنذار التراكمي تماماً وبقى الاعتماد على الفصلي بس
+    let totalCount = consecutiveWarnings;
     
     let text = 'وضع أكاديمي مستقر';
-    if (hasCumulativeWarning && consecutiveWarnings > 0) {
-       text = `إنذار تراكمي + ${consecutiveWarnings} إنذار فصلي`;
-    } else if (hasCumulativeWarning) {
-       text = 'إنذار تراكمي (CGPA < 2.0)';
-    } else if (consecutiveWarnings > 0) {
+    if (consecutiveWarnings > 0) {
        text = `${consecutiveWarnings} إنذار فصلي متتالي`;
     }
 
     return { count: totalCount, text, isDanger: totalCount > 0 };
-  }, [semesters, cgpa, completedCredits, officialSemesters]);
+    
+  // 5. مسحنا cgpa و completedCredits من المصفوفة تحت لأننا مابقيناش نستخدمهم للإنذار
+  }, [semesters, officialSemesters]);
 
   const handleAddSemester = (name: string) => {
     if (semesters.find(s => s.name === name)) return alert("هذا الفصل مضاف بالفعل");

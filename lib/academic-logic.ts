@@ -107,6 +107,60 @@ export function getEffectiveRecords(records: StudentCourseRecord[]): StudentCour
   return Array.from(effectiveRecordsMap.values());
 }
 
+
+/**
+ * حساب الإنذارات الأكاديمية الفصلية (تتجاهل الصيفي وتتصفر بالنجاح)
+ */
+export function calculateAcademicWarnings(
+  semesters: any[], 
+  coursesCatalog: Course[]
+  ): { warningsCount: number; isAtRisk: boolean } {
+    let warningsCount = 0;
+
+    for (const sem of semesters) {
+      // 1. تخطي الترم الصيفي تماماً
+      const semName = (sem.name || "").toLowerCase();
+      if (semName.includes('summer') || semName.includes('صيفي')) {
+        continue;
+      }
+
+      const courses = sem.courses || [];
+
+      // 2. فحص صريح للترمات الصفرية (خالية من المواد أو كل موادها Taken/-)
+      // بيلف على المواد يتأكد هل فيه مادة واحدة على الأقل ليها تقدير حقيقي
+      const hasEffectiveCourses = courses.some((c: any) => 
+        c.grade && c.grade !== 'Taken' && c.grade !== '-'
+      );
+
+      // لو الترم مفيهوش مواد خالص، أو كل مواده لسه Taken، اعمل تخطي فوراً
+      if (courses.length === 0 || !hasEffectiveCourses) {
+        continue; 
+      }
+
+      // 3. حساب المعدل الفصلي للمواد الفعالة فقط
+      const semGpaResult = calculateGPA(courses, coursesCatalog);
+
+      // تأكيد إضافي لتجنب أي أخطاء حسابية في الساعات
+      if (semGpaResult.totalCredits === 0) {
+        continue;
+      }
+
+      // 4. تطبيق منطق الإنذار المتتالي
+      if (semGpaResult.gpa < 2.0) {
+        warningsCount++; // المعدل وقع، خد إنذار زيادة
+      } else {
+        warningsCount = 0; // المعدل اتظبط، العداد يرجع صفر
+      }
+    }
+
+    return {
+      warningsCount,
+      isAtRisk: warningsCount > 0
+    };
+  }
+
+
+
 /**
  * حساب المعدل التراكمي (GPA) وساعات الرسوب
  */

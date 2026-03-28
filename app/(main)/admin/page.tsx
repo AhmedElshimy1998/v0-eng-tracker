@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
 import { getAllStudents } from "@/lib/adminActions";
-import { calculateGPA, getEffectiveRecords } from "@/lib/academic-logic";
+import { calculateGPA, getEffectiveRecords, calculateAcademicWarnings } from "@/lib/academic-logic";
 import { coursesCatalog } from "@/lib/courses";
 
 interface LevelStat {
@@ -81,7 +81,7 @@ export default function AdminDashboardMain() {
          const { gpa } = calculateGPA(lastFinishedSemester.courses, coursesCatalog);
          lastSemGpa = gpa;
       }
-
+        const warningStatus = calculateAcademicWarnings(semesters, coursesCatalog);
       // === باقي اللوجيك بتاعك لتوزيع الإحصائيات زي ما هو بالظبط ===
       if (totalCredits > 0) {
         totalGpa += cgpa;
@@ -89,7 +89,7 @@ export default function AdminDashboardMain() {
         lvlStats[level].gpaSum += cgpa;
         lvlStats[level].gpaCount++;
         
-        if (cgpa < 2.0 || lastSemGpa < 2.0) {
+        if (warningStatus.isAtRisk) {
           atRiskCount++;
           lvlStats[level].atRisk++;
         }
