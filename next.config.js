@@ -39,6 +39,7 @@ const withPWA = withPWAInit({
       },
       // 3. تكييش الصور والملفات الثابتة
       {
+        //
         urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
         handler: 'CacheFirst',
         options: {
