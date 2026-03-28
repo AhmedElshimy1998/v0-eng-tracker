@@ -5,15 +5,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    let cursor = 0;
+    let cursor: string | number = 0; // تقبل رقم أو نص
     const allKeys: string[] = [];
-
-    // 1. 🚀 SCAN بجلب كل مفاتيح الداتا بيز بلا استثناء
+    
     do {
-      const [nextCursor, keys] = await kv.scan(cursor, { count: 1000 });
+      // 🚀 استخدمنا Number(cursor) عشان نضمن إنها متبقاش نص أبداً في المقارنة
+      const [nextCursor, keys] = await kv.scan(cursor, { count: 10000 });
       allKeys.push(...keys);
       cursor = nextCursor;
-    } while (cursor !== 0);
+    } while (Number(cursor) !== 0); // هنا هيفهم إن "0" هي هي 0 وهيقف فوراً
 
     if (allKeys.length === 0) {
       return NextResponse.json({ message: "Database is already empty" });
