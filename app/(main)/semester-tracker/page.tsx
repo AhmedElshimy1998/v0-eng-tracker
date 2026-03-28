@@ -39,6 +39,8 @@ export default function SemesterTrackerPage() {
       if (pendingSave.current) {
         saveAcademicProfile({ semesters: latestSemesters.current, lastUpdated: Date.now() });
         pendingSave.current = false;
+
+        localStorage.setItem("academic-needs-sync", "false");
       }
     };
     window.addEventListener("visibilitychange", () => {
