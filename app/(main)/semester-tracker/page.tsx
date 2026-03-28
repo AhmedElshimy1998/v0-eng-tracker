@@ -17,64 +17,11 @@ import { coursesCatalog } from "@/lib/courses";
 import { SemesterData, Grade } from "@/lib/types";
 import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions";
 
-
-
 export default function SemesterTrackerPage() {
   const [studentDept, setStudentDept] = useState<string>("");
   const [semesters, setSemesters] = useState<SemesterData[]>([]);
   const [actualDeptName, setActualDeptName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-
-  const pendingSave = useRef(false);
-  const latestSemesters = useRef(semesters);
-
-
-  // 1. محرك الحفظ الذكي (Debounce + Local Cache)
-  useEffect(() => {
-    // تجاهل الحفظ إذا كانت الداتا لسه بتحمل
-    if (!semesters || semesters.length === 0) return;
-
-    // حفظ محلي فوري كنسخة احتياطية
-    localStorage.setItem("studyhub-degree-audit", JSON.stringify(semesters));
-    pendingSave.current = true;
-
-    // تشغيل تايمر 3 ثواني بعد آخر تعديل
-    const syncTimer = setTimeout(async () => {
-      try {
-        await saveAcademicProfile({ semesters });
-        pendingSave.current = false;
-      } catch (error) {
-        console.error("خطأ في المزامنة:", error);
-      }
-    }, 60000);
-
-    // إلغاء التايمر لو المستخدم عمل تعديل جديد قبل انتهاء الـ 3 ثواني
-    return () => clearTimeout(syncTimer);
-  }, [semesters]);
-
-  // 2. ضمان الإرسال للسيرفر عند إغلاق الموقع أو الخروج من الصفحة
-  useEffect(() => {
-    const handleExit = () => {
-      // لو في تعديلات لسه متبعتتش (التايمر مخلصش) والمستخدم قفل
-      if (pendingSave.current) {
-        saveAcademicProfile({ semesters: latestSemesters.current });
-        pendingSave.current = false;
-      }
-    };
-
-    // يراقب تغيير التاب أو قفل المتصفح
-    window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === 'hidden') handleExit();
-    });
-    // يراقب قفل الصفحة بشكل كامل (Refresh / Close)
-    window.addEventListener("beforeunload", handleExit);
-
-    return () => {
-      window.removeEventListener("visibilitychange", handleExit);
-      window.removeEventListener("beforeunload", handleExit);
-      handleExit(); // يحفظ لو اتنقل لصفحة تانية داخل الموقع (Unmount)
-    };
-  }, []);
 
   // 2. التحميل الذكي (أوفلاين أولاً)
   // 1. التحميل الذكي (أوفلاين أولاً)
@@ -172,38 +119,85 @@ export default function SemesterTrackerPage() {
   }, []);
 
   // 3. الحفظ الفوري (Optimistic Saving)
-  const saveSemestersToCloud = async (updatedSemesters: SemesterData[]) => {
-    // 1. تحديث الـ State فوراً لضمان تجربة مستخدم سريعة (Optimistic UI)
-    setSemesters(updatedSemesters); 
+  const saveSemestersToCloud = async (updatedSemesters: SemesterData[]) => {// 1. مراجع لتتبع التايمر والداتا أثناء الإغلاق
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSave = useRef(false);
+  const latestSemesters = useRef(semesters);
+
+  useEffect(() => {
+    latestSemesters.current = semesters;
+  }, [semesters]);
+
+  // 2. الدالة السحرية (Debounced Save) - استبدل دالتك القديمة بهذه
+  const saveSemestersToCloud = (updatedSemesters: SemesterData[]) => {
+    // 1. تحديث الشاشة فوراً
+    setSemesters(updatedSemesters);
     
-    // 2. الحفظ المحلي الفوري (عشان لو حصل ريفرش أو النت فصل)
+    // 2. الحفظ المحلي فوراً (بالمفتاح الأصلي بتاعك عشان الداتا ماتضيعش!)
     const localProfileStr = localStorage.getItem("studyhub-academic-profile");
     let profileObj = localProfileStr ? JSON.parse(localProfileStr) : {};
+    
     profileObj.semesters = updatedSemesters;
-    profileObj.lastUpdated = Date.now(); // إضافة تايم ستامب للمزامنة الذكية
+    profileObj.lastUpdated = Date.now(); // ختم الوقت مهم جداً
+    
     localStorage.setItem("studyhub-academic-profile", JSON.stringify(profileObj));
+    localStorage.setItem("academic-needs-sync", "true"); // علامة إن في داتا لسه مترفعتش
+    
+    pendingSave.current = true;
 
-    // 3. تفعيل علامة "محتاج مزامنة" (دي الأمان بتاعنا لو الرفع فشل)
-    localStorage.setItem("academic-needs-sync", "true");
-
-    // 4. محاولة الرفع للسيرفر فوراً لو فيه إنترنت
-    if (navigator.onLine) {
-      try {
-        console.log("📤 جاري محاولة رفع التعديلات الأكاديمية...");
-        const result = await saveAcademicProfile({ 
-          semesters: updatedSemesters, 
-          lastUpdated: profileObj.lastUpdated 
-        });
-        
-        if (result.success) {
-          // لو الرفع تم بنجاح، نشيل علامة الاحتياج للمزامنة
-          localStorage.setItem("academic-needs-sync", "false");
-          console.log("✅ تمت المزامنة الفورية بنجاح!");
-        }
-      } catch (e) {
-        console.log("⚠️ فشل الرفع الفوري، سيتم المحاولة مرة أخرى عند استقرار الاتصال.");
-      }
+    // 3. مسح أي تايمر قديم لو المستخدم ضغط تعديل/إضافة مرتين ورا بعض بسرعة
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
     }
+
+    // 4. تشغيل تايمر الـ 3 ثواني (الرفع للسيرفر أمر واحد مجمع)
+    syncTimerRef.current = setTimeout(async () => {
+      if (navigator.onLine) {
+        try {
+          console.log("📤 جاري رفع التعديلات المجمعة للسيرفر...");
+          const result = await saveAcademicProfile({ 
+            semesters: updatedSemesters, 
+            lastUpdated: profileObj.lastUpdated 
+          });
+          
+          if (result.success) {
+            localStorage.setItem("academic-needs-sync", "false"); // نشيل العلامة
+            pendingSave.current = false;
+            console.log("✅ تمت المزامنة للسيرفر بنجاح بـ 1 Command!");
+          }
+        } catch (e) {
+          console.error("⚠️ فشل الرفع، سيعاد المحاولة.");
+        }
+      }
+    }, 3000);
+  };
+
+  // 3. صمام الأمان الفولاذي (لو قفل الصفحة فجأة قبل الـ 3 ثواني ما يخلصوا)
+  useEffect(() => {
+    const handleExit = () => {
+      // لو في حفظ متعلق (pending) والمستخدم بيقفل، نضربه للسيرفر فوراً
+      if (pendingSave.current) {
+        saveAcademicProfile({ 
+          semesters: latestSemesters.current, 
+          lastUpdated: Date.now() 
+        });
+        pendingSave.current = false;
+      }
+    };
+
+    // مراقبة تغيير التاب أو قفل المتصفح أو عمل ريفرش
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === 'hidden') handleExit();
+    });
+    window.addEventListener("beforeunload", handleExit);
+
+    return () => {
+      window.removeEventListener("visibilitychange", handleExit);
+      window.removeEventListener("beforeunload", handleExit);
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      handleExit();
+    };
+  }, []);
   };
 
   const displayCatalog = useMemo(() => {
@@ -272,8 +266,7 @@ export default function SemesterTrackerPage() {
   const handleAddSemester = (name: string) => {
     if (semesters.find(s => s.name === name)) return alert("هذا الفصل مضاف بالفعل");
     const updated = [...semesters, { name, semesterGpa: 0, semesterCredits: 0, courses: [] }];
-    //saveSemestersToCloud(updated);
-    setSemesters(updated);
+    saveSemestersToCloud(updated);
   };
 
   const handleGradeChange = (semIndex: number, courseId: string, newGrade: Grade) => {
@@ -281,8 +274,7 @@ export default function SemesterTrackerPage() {
     const course = updated[semIndex].courses.find(c => c.id === courseId);
     if (course) {
       course.grade = newGrade;
-      //saveSemestersToCloud(updated);
-      setSemesters(updated);
+      saveSemestersToCloud(updated);
     }
   };
 
@@ -614,8 +606,7 @@ export default function SemesterTrackerPage() {
         </div>
                     <Button variant="ghost" size="icon" onClick={() => {
                       if(confirm("متأكد من حذف هذا الفصل بالكامل؟")) {
-                        const up = [...semesters]; up.splice(semIndex,1); setSemesters(up);
-                        // saveSemestersToCloud(up);
+                        const up = [...semesters]; up.splice(semIndex,1); saveSemestersToCloud(up);
                       }
                     }}>
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -635,8 +626,7 @@ export default function SemesterTrackerPage() {
                           points: 0, 
                           isRetake: allStudentRecords.some(r => r.courseCode === code) 
                         });
-                        setSemesters(updated); e.target.value = "";
-                        //saveSemestersToCloud(updated);
+                        saveSemestersToCloud(updated); e.target.value = "";
                       }}
                       defaultValue=""
                       >
@@ -694,8 +684,7 @@ export default function SemesterTrackerPage() {
                              {["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "F", "Fail", "Taken"].map(g => <option key={g} value={g}>{g}</option>)}
                            </select>
                            <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 text-muted-foreground hover:text-destructive" onClick={() => {
-                             const updated = [...semesters]; updated[semIndex].courses = updated[semIndex].courses.filter(item => item.id !== record.id); setSemesters(updated);
-                             // saveSemestersToCloud(updated);
+                             const updated = [...semesters]; updated[semIndex].courses = updated[semIndex].courses.filter(item => item.id !== record.id); saveSemestersToCloud(updated);
                            }}><XCircle className="h-4 w-4" /></Button>
                          </div>
                        )
