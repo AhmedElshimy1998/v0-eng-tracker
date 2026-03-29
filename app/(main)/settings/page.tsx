@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { User, Phone, GraduationCap, Save, Loader2, AlertTriangle} from "lucide-react";
 import { getAcademicProfile, saveAcademicProfile, getDepartments, DepartmentItem } from "@/lib/academicActions"; 
+import { useRouter } from "next/navigation";
+
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [department, setDepartment] = useState("");
@@ -41,7 +44,9 @@ export default function SettingsPage() {
     setIsSaving(false);
     
     if (result.success) {
-      alert("تم حفظ الإعدادات بنجاح في السحابة!");
+      toastt("تم حفظ الإعدادات بنجاح في السحابة!");
+      router.refresh();
+      router.push("/semester-tracker");
     } else {
       alert("حدث خطأ أثناء الحفظ.");
     }

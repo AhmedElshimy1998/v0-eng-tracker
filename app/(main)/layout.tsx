@@ -3,6 +3,7 @@ import { usePathname } from "next/navigation"
 import { ClerkProvider } from '@/lib/auth-client'
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "sonner"
+import { toastt } from "@/lib/toast-utils";
 import { ProfileGuard } from "@/components/profile-guard";
 import { useEffect } from "react";
 import { saveAcademicProfile } from "@/lib/academicActions";
@@ -21,6 +22,7 @@ export default function MainLayout({
 
   // --- مراقب المزامنة الذكي للبيانات الأكاديمية (Sync Engine) ---
   useEffect(() => {
+    (window as any).toastt = toastt;
     const handleOnline = async () => {
       // نتأكد الأول إن فيه تعديلات اتعملت أوفلاين ومحتاجة تترفع
       const needsSync = localStorage.getItem("academic-needs-sync");
@@ -67,6 +69,7 @@ export default function MainLayout({
             <div className="container mx-auto max-w-7xl p-6 lg:p-8">
               <ProfileGuard>
                 {children}
+                <Toaster dir="rtl" richColors closeButton />
               </ProfileGuard>
             </div>
           )}
