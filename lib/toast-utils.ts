@@ -1,9 +1,18 @@
-import { toast } from "sonner"; // استدعاء sonner
+import { toast } from "sonner";
 
-export const toastt = (message: string, type: "default" | "destructive" = "default") => {
-  if (type === "destructive") {
-    toast.error(message); // هيظهر لون أحمر للخطأ
-  } else {
-    toast.success(message); // هيظهر لون أخضر للنجاح
+// 1. بنعرف الدالة الأساسية (للنجاح - أخضر)
+const baseToast = (message: string) => {
+  if (typeof window !== "undefined") {
+    toast.success(message);
   }
 };
+
+// 2. بنضيف وظيفة "الخطأ" كفرع منها (للأحمر)
+baseToast.error = (message: string) => {
+  if (typeof window !== "undefined") {
+    toast.error(message);
+  }
+};
+
+// 3. تصدير الدالة بعد التعديل
+export const toastt = baseToast;
