@@ -69,28 +69,28 @@ export default function RolesManagementPage() {
   }, [users, searchTerm, selectedLevel, departments]);
 
   const handleToggleRole = async (targetId: string, currentIsAdmin: boolean) => {
-    if (targetId === currentUserId) return alert("لا يمكنك تغيير صلاحيات نفسك من هذه الشاشة!");
+    if (targetId === currentUserId) return toastt.warn("لا يمكنك تغيير صلاحيات نفسك من هذه الشاشة!");
     const confirmMsg = currentIsAdmin ? "هل أنت متأكد من سحب صلاحيات الإدارة من هذا المستخدم؟" : "هل أنت متأكد من ترقية هذا المستخدم ليكون مدير (Admin)؟";
     if (!confirm(confirmMsg)) return;
 
     setProcessingId(targetId);
     const result = await toggleAdminStatus(targetId, !currentIsAdmin);
     if (result.success) await loadData();
-    else alert("حدث خطأ أثناء تعديل الصلاحيات.");
+    else toastt.error("حدث خطأ أثناء تعديل الصلاحيات.");
     setProcessingId(null);
   };
 
   const handleDeleteUser = async (targetId: string, userName: string) => {
-    if (targetId === currentUserId) return alert("لا يمكنك حذف حسابك الشخصي من هنا!");
+    if (targetId === currentUserId) return toastt.warn("لا يمكنك حذف حسابك الشخصي من هنا!");
     const confirmMsg = `⚠️ تحذير خطير ⚠️\nهل أنت متأكد من حذف الطالب "${userName}" نهائياً؟\nسيتم مسح حسابه وكل بياناته من قاعدة البيانات ولن يمكن التراجع عن هذا الإجراء!`;
     if (!confirm(confirmMsg)) return;
 
     setProcessingId(targetId);
     const result = await deleteUserAccount(targetId);
     if (result.success) {
-      alert("تم حذف المستخدم وكل بياناته بنجاح.");
+      toastt("تم حذف المستخدم وكل بياناته بنجاح.");
       await loadData();
-    } else alert(`حدث خطأ أثناء الحذف: ${result.error || "مجهول"}`);
+    } else toastt.error(`حدث خطأ أثناء الحذف: ${result.error || "مجهول"}`);
     setProcessingId(null);
   };
 

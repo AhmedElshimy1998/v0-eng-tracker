@@ -206,7 +206,7 @@ export default function SemesterTrackerPage() {
               localStorage.setItem("studyhub-academic-profile", JSON.stringify(freshProfile));
               
               // 3. تنبيه الطالب عشان ميتخضش إن الداتا اتغيرت قدامه
-              alert("تم تحديث الشاشة بناءً على تعديلات قمت بها من جهاز آخر لضمان عدم فقدان البيانات.");
+              toastt.warn("تم تحديث الشاشة بناءً على تعديلات قمت بها من جهاز آخر لضمان عدم فقدان البيانات.");
             }
           }
         } catch (e) {
@@ -288,7 +288,7 @@ export default function SemesterTrackerPage() {
   }, [semesters, officialSemesters]);
 
   const handleAddSemester = (name: string) => {
-    if (semesters.find(s => s.name === name)) return alert("هذا الفصل مضاف بالفعل");
+    if (semesters.find(s => s.name === name)) return toastt.warn("هذا الفصل مضاف بالفعل");
     const updated = [...semesters, { name, semesterGpa: 0, semesterCredits: 0, courses: [] }];
     saveSemestersToCloud(updated);
   };

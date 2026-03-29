@@ -33,7 +33,7 @@ export default function AdminNotificationsPage() {
   }, []);
 
   const handleSend = async () => {
-    if (!title || !message) return alert("يرجى كتابة العنوان والرسالة.");
+    if (!title || !message) return toastt.warn("يرجى كتابة العنوان والرسالة.");
     setIsSending(true);
     
     try {
@@ -51,13 +51,13 @@ export default function AdminNotificationsPage() {
 
       if (data.success) {
         // تم تصحيح اسم المتغير هنا ليتطابق مع السيرفر
-        alert(`اكتملت العملية!\nتم الإرسال لـ ${data.targetedUsers} طالب.\nإجمالي الأجهزة المستلمة: ${data.sentCount}`);
+        toastt(`اكتملت العملية!\nتم الإرسال لـ ${data.targetedUsers} طالب.\nإجمالي الأجهزة المستلمة: ${data.sentCount}`);
         setTitle(""); setMessage("");
       } else {
-        alert("حدث خطأ: " + data.error);
+        toastt.error("حدث خطأ: " + data.error);
       }
     } catch (error) {
-      alert("تعذر الاتصال بالسيرفر.");
+      toastt.error("تعذر الاتصال بالسيرفر.");
     } finally {
       setIsSending(false);
     }

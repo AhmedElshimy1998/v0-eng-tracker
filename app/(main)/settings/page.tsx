@@ -44,11 +44,11 @@ export default function SettingsPage() {
     setIsSaving(false);
     
     if (result.success) {
-      toastt.error("تم حفظ الإعدادات بنجاح في السحابة!");
+      toastt("تم حفظ الإعدادات بنجاح في السحابة!");
       router.refresh();
       router.push("/semester-tracker");
     } else {
-      alert("حدث خطأ أثناء الحفظ.");
+      toastt.error("حدث خطأ أثناء الحفظ.");
     }
   };
 
