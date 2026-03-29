@@ -43,7 +43,7 @@ export default function AdminPage() {
   };
 
   const handleDeleteDepartment = async (id: string) => {
-    if (id === "General") return alert("لا يمكن حذف قسم المواد العامة الأساسي!");
+    if (id === "General") return toastt.error("لا يمكن حذف قسم المواد العامة الأساسي!");
     if (confirm("هل أنت متأكد من حذف هذا القسم؟")) {
       const updated = departments.filter(d => d.id !== id);
       setDepartments(updated);

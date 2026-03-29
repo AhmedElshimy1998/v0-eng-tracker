@@ -44,7 +44,7 @@ export default function SettingsPage() {
     setIsSaving(false);
     
     if (result.success) {
-      toastt("تم حفظ الإعدادات بنجاح في السحابة!");
+      toastt.error("تم حفظ الإعدادات بنجاح في السحابة!");
       router.refresh();
       router.push("/semester-tracker");
     } else {
