@@ -12,13 +12,13 @@ import { checkIsAdmin } from "@/lib/adminActions"
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, prefetch: true },
   { name: "Subjects", href: "/subjects", icon: BookOpen, prefetch: true },
-  { name: "Calendar", href: "/calendar", icon: Calendar, prefetch: true },
+  { name: "Calendar", href: "/calendar", icon: Calendar, prefetch: false },
   { name: "Semester Tracker", href: "/semester-tracker", icon: GraduationCap, prefetch: true },
-  { name: "AI Smart Advisor", href: "/ai-mentor", icon: BrainCircuit, prefetch: true },
-  { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map, prefetch: true }, 
-  { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator, prefetch: true }, 
-  { name: "الأخبار والإشعارات", href: "/news", icon: Newspaper, prefetch: true },
-  { name: "Settings", href: "/settings", icon: Settings, prefetch: true },
+  { name: "AI Smart Advisor", href: "/ai-mentor", icon: BrainCircuit, prefetch: false },
+  { name: "Degree Audit (الخريطة)", href: "/degree-audit", icon: Map, prefetch: false }, 
+  { name: "GPA Simulator (المحاكاة)", href: "/simulator", icon: Calculator, prefetch: false }, 
+  { name: "الأخبار والإشعارات", href: "/news", icon: Newspaper, prefetch: false },
+  { name: "Settings", href: "/settings", icon: Settings, prefetch: false },
   { name: "Admin Dashboard", href: "/admin", icon: Shield, adminOnly: true, prefetch: false }, 
 ]
 
